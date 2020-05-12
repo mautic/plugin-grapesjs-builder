@@ -47,8 +47,8 @@ Mautic.launchBuilder = function (formName, actionName) {
  *
  * @param object
  */
+var editor;
 Mautic.initGrapesJS = function (object) {
-    let editor;
     let panelManager;
     let textareaHtml = mQuery('textarea.builder-html');
     let textareaAssets = mQuery('textarea#grapesjsbuilder_assets');
@@ -288,6 +288,21 @@ Mautic.initGrapesJS = function (object) {
 
         // Clear stack of undo/redo
         um.clear();
+
+        editor.getWrapper().findType('image').forEach(function(el){
+            console.log(el.view.el);
+            mQuery(el.view.el).addClass('fr-fil');
+            mQuery(el.view.el).addClass('fr-dib');
+            mQuery(el.view.el).froalaEditor()
+        })
+
+        editor.getWrapper().findType('mj-image').forEach(function(el){
+            let element = el.view.$el;
+            element.find('img').addClass('fr-fil');
+            element.find('img').addClass('fr-dib');
+            element.find('img').froalaEditor()
+        })
+
     });
 
     editor.on('component:add', (component) => {
@@ -562,7 +577,7 @@ let deleteDynamicContentItem = function (component) {
 
 let manageDynamicContentTokenToSlot = function (component) {
     const regex = RegExp(/\{dynamiccontent="(.*)"\}/,'g');
-
+    
     let content = component.get('content');
     let regexEx = regex.exec(content);
 
