@@ -1,14 +1,22 @@
 # GrapesJS Builder with MJML support for Mautic
 
-## Installation
+## Installation for Mautic 2.x
 
 1. Apply PR https://github.com/mautic/mautic/pull/8892
 
 2. Copy to plugin/IntegrationsBundle https://github.com/mautic-inc/plugin-integrations  +  PR https://github.com/mautic-inc/plugin-integrations/pull/76
 
-3. Copy to plugins/GrapesJsBuilderBundle actual version of GrapeJS bundle https://github.com/Webmecanik/plugin-grapesjs-builder/archive/master.zip
+3. Copy to plugins/GrapesJsBuilderBundle actual version of GrapeJS bundle for Mautic 2 https://github.com/Webmecanik/plugin-grapesjs-builder/archive/master.zip
 
-4. Remove cache
+4. Clear cache
+
+## Installation for Mautic 3.x
+
+1. Appy PR https://github.com/mautic/mautic/pull/9050
+
+2. Copy to plugins/GrapesJsBuilderBundle actual version of GrapeJS bundle for Mautic 3 https://github.com/Webmecanik/plugin-grapesjs-builder/archive/mautic3x.zip
+
+3. Clear cache
 
 ## Setup
 
