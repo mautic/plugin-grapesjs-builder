@@ -61,6 +61,7 @@ Mautic.initGrapesJS = function (object) {
         embedAsBase64: false,
         openAssetsOnDrop: 1,
         autoAdd: true,
+        headers: {'X-CSRF-Token': mauticAjaxCsrf},
     };
 
     let presetMauticConf = {
