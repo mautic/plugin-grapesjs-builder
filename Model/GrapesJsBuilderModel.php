@@ -66,12 +66,15 @@ class GrapesJsBuilderModel extends AbstractCommonModel
             if (isset($data['customMjml'])) {
                 $grapesJsBuilder->setCustomMjml($data['customMjml']);
             }
+
+            $this->getRepository()->saveEntity($grapesJsBuilder);
+
+            $customHtml = ArrayHelper::getValue(
+                'customHtml',
+                $this->requestStack->getCurrentRequest()->get('emailform')
+            );
+            $email->setCustomHtml($customHtml);
+            $this->emailModel->getRepository()->saveEntity($email);
         }
-
-        $this->getRepository()->saveEntity($grapesJsBuilder);
-
-        $customHtml = ArrayHelper::getValue('customHtml', $this->requestStack->getCurrentRequest()->get('emailform'));
-        $email->setCustomHtml($customHtml);
-        $this->emailModel->getRepository()->saveEntity($email);
     }
 }
