@@ -3,7 +3,8 @@ import grapesjsmjml from 'grapesjs-mjml';
 import grapesjsnewsletter from 'grapesjs-preset-newsletter';
 import grapesjswebpage from 'grapesjs-preset-webpage';
 import grapesjspostcss from 'grapesjs-parser-postcss';
-import grapesjsmautic from 'grapesjs-preset-mautic/src';
+import grapesckeditor from 'grapesjs-plugin-ckeditor';
+import grapesjsmautic from '../../../../../../grapesjs-preset-mautic/src';
 
 export default class BuilderService {
   presetMauticConf;
@@ -179,11 +180,12 @@ export default class BuilderService {
       styleManager: {
         clearProperties: true, // Temp fix https://github.com/artf/grapesjs-preset-webpage/issues/27
       },
-      plugins: [grapesjswebpage, grapesjspostcss, grapesjsmautic],
+      plugins: [grapesjswebpage, grapesjspostcss, grapesckeditor, grapesjsmautic],
       pluginsOpts: {
         [grapesjswebpage]: {
           formsOpts: false,
         },
+        grapesckeditor: {},
         grapesjsmautic: this.presetMauticConf,
       },
     });
