@@ -1,6 +1,5 @@
 import 'grapesjs/dist/css/grapes.min.css';
 import grapesjs from 'grapesjs';
-import grapesjsmjml from 'grapesjs-mjml';
 import grapesckeditor from 'grapesjs-plugin-ckeditor';
 
 let editor = grapesjs.init({
