@@ -28,6 +28,7 @@
     "grapesjs-mjml": "^0.4.2",
     "grapesjs-parser-postcss": "^0.1.1",
     "grapesjs-preset-mautic": "github:mautic/grapesjs-preset-mautic#master",
+    "grapesjs-plugin-ckeditor": "^0.0.10",
     "grapesjs-preset-newsletter": "^0.2.20",
     "grapesjs-preset-webpage": "^0.1.11"
   },
