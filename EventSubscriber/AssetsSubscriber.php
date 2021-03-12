@@ -42,6 +42,7 @@ class AssetsSubscriber implements EventSubscriberInterface
         }
         if ($this->config->isPublished()) {
             $assetsEvent->addScript('plugins/GrapesJsBuilderBundle/Assets/library/js/dist/builder.js');
+            $assetsEvent->addScript('https://cdn.ckeditor.com/4.16.0/standard-all/ckeditor.js');
 
             $assetsEvent->addStylesheet('plugins/GrapesJsBuilderBundle/Assets/library/css/builder.css');
             $assetsEvent->addStylesheet('plugins/GrapesJsBuilderBundle/Assets/library/css/grapes.min.css');
