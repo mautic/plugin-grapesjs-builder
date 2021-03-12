@@ -66957,8 +66957,20 @@ var BuilderService = /*#__PURE__*/function () {
         plugins: [_grapesjsPresetWebpage.default, _grapesjsParserPostcss.default, _grapesjsPluginCkeditor.default, _src.default],
         pluginsOpts: (_pluginsOpts = {}, _defineProperty(_pluginsOpts, _grapesjsPresetWebpage.default, {
           formsOpts: false
-        }), _defineProperty(_pluginsOpts, "grapesckeditor", {}), _defineProperty(_pluginsOpts, "grapesjsmautic", this.presetMauticConf), _pluginsOpts)
-      }); // Customize GrapesJS -> add close button with save for Mautic
+        }), _defineProperty(_pluginsOpts, "grapesckeditor", {
+          options: {
+            language: 'de',
+            toolbar: [],
+            dtd: {
+              $editable: {
+                a: 1
+              }
+            },
+            position: 'bottom'
+          }
+        }), _defineProperty(_pluginsOpts, "grapesjsmautic", this.presetMauticConf), _pluginsOpts)
+      }); // CKEDITOR.dtd.$editable.a = 1;
+      // Customize GrapesJS -> add close button with save for Mautic
 
       this.getCloseButton('mautic-editor-page-html-close');
       return this.editor;
