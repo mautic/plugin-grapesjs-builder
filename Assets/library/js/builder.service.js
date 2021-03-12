@@ -190,8 +190,6 @@ export default class BuilderService {
       },
     });
 
-    // CKEDITOR.dtd.$editable.a = 1;
-
     // Customize GrapesJS -> add close button with save for Mautic
     this.getCloseButton('mautic-editor-page-html-close');
     return this.editor;
