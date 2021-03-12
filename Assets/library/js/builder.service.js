@@ -185,18 +185,7 @@ export default class BuilderService {
         [grapesjswebpage]: {
           formsOpts: false,
         },
-        grapesckeditor: {
-          options: {
-            language: 'de',
-            toolbar: [],
-            dtd: {
-              $editable: {
-                a: 1,
-              },
-            },
-            position: 'bottom',
-          },
-        },
+        grapesckeditor: {},
         grapesjsmautic: this.presetMauticConf,
       },
     });
