@@ -20,7 +20,10 @@ export default class BuilderService {
 
   deletePath;
 
-  constructor(content, assets, uploadPath, deletePath) {
+  // HTMLHeadElement
+  head;
+
+  constructor(content, assets, uploadPath, deletePath, head) {
     if (!content) {
       throw Error('No HTML or MJML content found');
     }
@@ -37,6 +40,7 @@ export default class BuilderService {
     this.assets = assets;
     this.uploadPath = uploadPath;
     this.deletePath = deletePath;
+    this.head = head;
   }
 
   /**
@@ -169,12 +173,16 @@ export default class BuilderService {
   }
 
   initPage() {
+    const styles = this.getStyles();
     // Launch GrapesJS with body part
     this.editor = grapesjs.init({
       clearOnRender: true,
       container: '.builder-panel',
       components: this.canvasContent,
       height: '100%',
+      canvas: {
+        styles,
+      },
       storageManager: false, // https://grapesjs.com/docs/modules/Storage.html#basic-configuration
       assetManager: this.getAssetManagerConf(),
       styleManager: {
@@ -251,6 +259,25 @@ export default class BuilderService {
   }
 
   /**
+   * Extract all stylesheets from the template <head>
+   */
+  getStyles() {
+    if (!this.head) {
+      return [];
+    }
+    const children = this.head.querySelectorAll('link');
+    const styles = [];
+
+    children.forEach((link) => {
+      if (link && link.rel === 'stylesheet') {
+        styles.push(link.href);
+      }
+    });
+
+    return styles;
+  }
+
+  /**
    * Convert dynamic content slots to tokens
    * Used in grapesjs-preset-mautic
    *
@@ -297,6 +324,12 @@ export default class BuilderService {
       if (!editor) {
         throw new Error('no page-html editor');
       }
+
+      // restore the original <head> if set
+      if (this.head && this.head.innerHTML) {
+        fullHtml.head.innerHTML = this.head.innerHTML;
+      }
+
       this.constructor.grapesConvertDynamicContentSlotsToTokens(editor);
 
       // Update textarea for save (part that is different from other modes)
