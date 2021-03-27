@@ -131,6 +131,7 @@ class FileManager
     {
         $files      = [];
         $uploadDir  = $this->getUploadDir();
+       
         $fileSystem = new Filesystem();
 
         if (!$fileSystem->exists($uploadDir)) {
