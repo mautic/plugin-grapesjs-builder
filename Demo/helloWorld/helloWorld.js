@@ -1,16 +1,12 @@
 import 'grapesjs/dist/css/grapes.min.css';
 import grapesjs from 'grapesjs';
-import grapesckeditor from 'grapesjs-plugin-ckeditor';
 
 let editor = grapesjs.init({
   fromElement: 1,
   container: '#gjs',
   height: '100%',
   avoidInlineStyle: false,
-  plugins: [grapesckeditor],
-  pluginsOpts: {
-    [grapesckeditor]: { language: 'de' },
-  },
+  plugins: [],
 });
 
 // add custom fonts options on editor's font list
