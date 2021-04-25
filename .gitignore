@@ -7,4 +7,5 @@
 !.htaccess
 !.gitkeep
 !Assets/library/js/dist
+node_modules/*
 vendor/*

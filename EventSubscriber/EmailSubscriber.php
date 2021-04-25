@@ -6,17 +6,11 @@ namespace MauticPlugin\GrapesJsBuilderBundle\EventSubscriber;
 
 use Mautic\EmailBundle\EmailEvents;
 use Mautic\EmailBundle\Event as Events;
-use MauticPlugin\GrapesJsBuilderBundle\Integration\Config;
 use MauticPlugin\GrapesJsBuilderBundle\Model\GrapesJsBuilderModel;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 class EmailSubscriber implements EventSubscriberInterface
 {
-    /**
-     * @var Config
-     */
-    private $config;
-
     /**
      * @var GrapesJsBuilderModel
      */
@@ -25,9 +19,8 @@ class EmailSubscriber implements EventSubscriberInterface
     /**
      * EmailSubscriber constructor.
      */
-    public function __construct(Config $config, GrapesJsBuilderModel $grapesJsBuilderModel)
+    public function __construct(GrapesJsBuilderModel $grapesJsBuilderModel)
     {
-        $this->config               = $config;
         $this->grapesJsBuilderModel = $grapesJsBuilderModel;
     }
 
@@ -47,10 +40,6 @@ class EmailSubscriber implements EventSubscriberInterface
      */
     public function onEmailPostSave(Events\EmailEvent $event)
     {
-        if (!$this->config->isPublished()) {
-            return;
-        }
-
         $this->grapesJsBuilderModel->addOrEditEntity($event->getEmail());
     }
 
@@ -59,10 +48,6 @@ class EmailSubscriber implements EventSubscriberInterface
      */
     public function onEmailDelete(Events\EmailEvent $event)
     {
-        if (!$this->config->isPublished()) {
-            return;
-        }
-
         $email           = $event->getEmail();
         $grapesJsBuilder = $this->grapesJsBuilderModel->getRepository()->findOneBy(['email' => $email]);
 

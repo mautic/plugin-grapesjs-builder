@@ -11,7 +11,6 @@ use Mautic\CoreBundle\Helper\TemplatingHelper;
 use Mautic\EmailBundle\Entity\Email;
 use MauticPlugin\GrapesJsBuilderBundle\Entity\GrapesJsBuilder;
 use MauticPlugin\GrapesJsBuilderBundle\Helper\FileManager;
-use MauticPlugin\GrapesJsBuilderBundle\Integration\Config;
 use MauticPlugin\GrapesJsBuilderBundle\Model\GrapesJsBuilderModel;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -19,11 +18,6 @@ use Symfony\Component\Routing\RouterInterface;
 
 class InjectCustomContentSubscriber implements EventSubscriberInterface
 {
-    /**
-     * @var Config
-     */
-    private $config;
-
     /**
      * @var GrapesJsBuilderModel
      */
@@ -52,9 +46,8 @@ class InjectCustomContentSubscriber implements EventSubscriberInterface
     /**
      * InjectCustomContentSubscriber constructor.
      */
-    public function __construct(Config $config, GrapesJsBuilderModel $grapesJsBuilderModel, FileManager $fileManager, TemplatingHelper $templatingHelper, RequestStack $requestStack, RouterInterface $router)
+    public function __construct(GrapesJsBuilderModel $grapesJsBuilderModel, FileManager $fileManager, TemplatingHelper $templatingHelper, RequestStack $requestStack, RouterInterface $router)
     {
-        $this->config               = $config;
         $this->grapesJsBuilderModel = $grapesJsBuilderModel;
         $this->fileManager          = $fileManager;
         $this->templatingHelper     = $templatingHelper;
@@ -71,10 +64,6 @@ class InjectCustomContentSubscriber implements EventSubscriberInterface
 
     public function injectViewCustomContent(CustomContentEvent $customContentEvent)
     {
-        if (!$this->config->isPublished()) {
-            return;
-        }
-
         $passParams = [];
         $parameters = $customContentEvent->getVars();
 
