@@ -8,6 +8,17 @@ import BuilderService from './builder.service';
  * @param actionName
  */
 function launchBuilderGrapesjs(formName) {
+
+  if (typeof Mautic.builderPanelHTML === 'undefined') {
+    Mautic.builderPanelHTML = mQuery('.builder-panel').html();
+  }
+
+  if (!Mautic.isThemeSupportedGrapesJs()) {
+    mQuery('.builder-panel').html(Mautic.builderPanelHTML);
+    Mautic.reArrangeStyles();
+    Mautic.legacyBuilder(formName);
+    return;
+  }
   // Parse HTML template
   const parser = new DOMParser();
   const textareaHtml = mQuery('textarea.builder-html');
@@ -101,12 +112,28 @@ function initSelectThemeGrapesjs(parentInitSelectTheme) {
   }
   return childInitSelectTheme;
 }
+Mautic.reArrangeStyles = function () {
+  mQuery('.builder-active').removeClass('builder-active');
+  mQuery('body').css('overflow-y', 'auto');
+  mQuery('section#app-wrapper').height('auto');
+  mQuery('.builder').addClass('code-mode');
+  mQuery('.builder .code-editor').removeClass('hide');
+  mQuery('.builder .code-mode-toolbar').removeClass('hide');
+  mQuery('.builder .builder-toolbar').addClass('hide');
+  mQuery('.builder-panel').css('padding', '');
+};
+
+Mautic.isThemeSupportedGrapesJs = function() {
+  return (!mQuery('.builder').hasClass('code-mode') && (mQuery('textarea.builder-html').length > 0 || mQuery('textarea.builder-mjml').val().length > 0));
+}
 
 Mautic.grapesConvertDynamicContentTokenToSlot =
   BuilderService.grapesConvertDynamicContentTokenToSlot;
 Mautic.grapesConvertDynamicContentSlotsToTokens =
   BuilderService.grapesConvertDynamicContentSlotsToTokens;
 Mautic.manageDynamicContentTokenToSlot = BuilderService.manageDynamicContentTokenToSlot;
-Mautic.launchBuilder = launchBuilderGrapesjs;
+Mautic.legacyBuilder = Mautic.launchBuilder;
 Mautic.initSelectTheme = initSelectThemeGrapesjs(Mautic.initSelectTheme);
 Mautic.setThemeHtml = setThemeHtml;
+Mautic.launchBuilder = launchBuilderGrapesjs;
+
