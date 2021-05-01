@@ -77,4 +77,11 @@ class GrapesJsBuilderModel extends AbstractCommonModel
             $this->emailModel->getRepository()->saveEntity($email);
         }
     }
+
+    public function getGrapesJsFromEmailId(?int $emailId)
+    {
+        if ($email = $this->emailModel->getEntity($emailId)) {
+            return $this->getRepository()->findOneBy(['email' => $email]);
+        }
+    }
 }

@@ -35,7 +35,7 @@ class GrapesJsController extends CommonController
         if (!in_array($objectType, self::OBJECT_TYPE)) {
             throw new \Exception('Object not authorized to load custom builder', Response::HTTP_CONFLICT);
         }
-        $this->logger     = $this->get('logger');
+        $this->logger     = $this->get('monolog.logger.mautic');
 
         /** @var \Mautic\EmailBundle\Model\EmailModel|\Mautic\PageBundle\Model\PageModel $model */
         $model      = $this->getModel($objectType);
@@ -86,6 +86,7 @@ class GrapesJsController extends CommonController
         $themeHelper  = $this->get('mautic.helper.theme');
 
         // Check for MJML template
+        // @deprecated - use mjml directly in email.html.twig
         if ($logicalName = $this->checkForMjmlTemplate($templateName.'.mjml.twig')) {
             $type        = 'mjml';
         } else {
@@ -122,6 +123,10 @@ class GrapesJsController extends CommonController
                 'basePath'  => $this->request->getBasePath(),
             ]
         );
+
+        if (false !== strpos($renderedTemplate, '<mjml>')) {
+            $type = 'mjml';
+        }
 
         $renderedTemplateHtml = ('html' === $type) ? $renderedTemplate : '';
         $renderedTemplateMjml = ('mjml' === $type) ? $renderedTemplate : '';
