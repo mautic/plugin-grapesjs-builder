@@ -1,10 +1,4 @@
-.*
-!.babelrc
-!.eslintrc
-!.prettierignore
-!.prettierrc
-!.gitignore
-!.htaccess
-!.gitkeep
+.cache
 !Assets/library/js/dist
 vendor/*
+node_modules/
