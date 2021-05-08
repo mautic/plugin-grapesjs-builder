@@ -1,0 +1,35 @@
+name: Build JS files for dist folder
+
+on:
+  # Allow manually triggering this workflow
+  workflow_dispatch:
+  schedule:
+    # Run every day at 10 AM UTC
+    - cron: '0 10 * * *'
+
+jobs:
+  build-js:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-node@v2
+      with:
+        node-version: '16'
+    - name: Install dependencies
+      run: npm install
+    - name: Build JS dist files
+      run: npm run build
+
+    # Checks if the JS files have been updated as a result of the NPM build,
+    # and commits the changes to the default branch if necessary.
+    - uses: EndBug/add-and-commit@v7
+      with:
+        # Only add changed files in Assets/library/js/dist to the commit
+        add: 'Assets/library/js/dist'
+
+        # Commits will be created by GitHub Actions
+        default_author: github_actions
+
+        # The message for the commit
+        message: 'Auto-update generated JS dist files'
