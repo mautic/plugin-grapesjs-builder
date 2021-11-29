@@ -221,6 +221,9 @@ export default class BuilderService {
         'gjs-plugin-ckeditor': BuilderService.getCkeConf(),
       },
     });
+    
+    // make editor accessable globaly for customizing
+    Mautic.grapesBuilder = this.editor;
 
     // add a Mautic custom block Button
     this.editor.BlockManager.get('button').set({
