@@ -222,7 +222,7 @@ export default class BuilderService {
       },
     });
     
-    // make editor accessable globaly for customizing
+    // make editor accessible globally for customizing
     Mautic.grapesBuilder = this.editor;
 
     // add a Mautic custom block Button
