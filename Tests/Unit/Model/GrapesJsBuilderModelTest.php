@@ -31,7 +31,7 @@ class GrapesJsBuilderModelTest extends \PHPUnit\Framework\TestCase
             {
             }
 
-            public function getCurrentRequest()
+            public function getCurrentRequest(): Request
             {
                 return new Request();
             }
