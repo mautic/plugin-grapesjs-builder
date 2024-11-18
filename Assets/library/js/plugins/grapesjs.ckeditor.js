@@ -57,7 +57,7 @@ export default (editor, opts = {}) => {
             title: 'Edit',
             content: getModalContent(el, ckEditorElementId),
             attributes: {
-                class: 'modalckeditor',
+                class: 'cke-modal',
                 id: generateId('cke-modal')
             }
         });
@@ -67,12 +67,6 @@ export default (editor, opts = {}) => {
 
     function getModalContent(el, ckEditorElementId) {
         return `
-            <style>
-                .modalckeditor .ck-editor .ck-editor__editable_inline {min-height:400px}
-                .modalckeditor .ck-editor .ck-content {background: #FFF;}
-                .modalckeditor .ck-editor .ck-content * {color: #000;}
-                .modalckeditor .gjs-btn-prim {margin: 10px 5px 5px 0;}
-            </style>
             <div id="${ckEditorElementId}">${el.innerHTML}</div>
             <button type="button" class="gjs-btn-prim" id="gjs-cke-save-btn">Save</button>
             <button type="button" class="gjs-btn-prim" id="gjs-cke-close-btn">Close</button>
