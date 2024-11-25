@@ -6,7 +6,7 @@ export default (editor, opts = {}) => {
     let ckEditorInstance = null;
     let gjsCurrentView = null;
 
-    const SIMPLE_EDITING_TYPES = ['mj-button'];
+    const SIMPLE_EDITING_TYPES = ['mj-button', 'link'];
 
     editor.on('rte:enable', (view, gjsRte) => {
         gjsCurrentView = view;
