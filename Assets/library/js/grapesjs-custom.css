@@ -367,9 +367,6 @@ html {
 .cke-modal .ck-editor .ck-content {
   min-height: 400px;
   background: #FFF;
-}
-
-.cke-modal .ck-editor .ck-content * {
   color: #000;
 }
 
