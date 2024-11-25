@@ -4,10 +4,12 @@ export default (editor, opts = {}) => {
     };
 
     let ckEditorInstance = null;
+    let gjsCurrentView = null;
 
     const SIMPLE_EDITING_TYPES = ['mj-button'];
 
     editor.on('rte:enable', (view, gjsRte) => {
+        gjsCurrentView = view;
         if (!isSimpleEditingEl(view.el)) {
             initializeModal(gjsRte.el);
             editor.RichTextEditor.hideToolbar();
@@ -81,9 +83,12 @@ export default (editor, opts = {}) => {
     function saveContent(el, modal) {
         if (ckEditorInstance) {
             const content = ckEditorInstance.getData();
-            const selectedElement = editor.getSelected();
-            if (selectedElement.getEl().innerHTML !== content) {
+            const selectedElement = gjsCurrentView.model;
+            const currentContent = selectedElement.get('content');
+            if (currentContent !== content) {
+                // Clear existing components to avoid conflicts
                 selectedElement.components('');
+                // Set the new content
                 selectedElement.set('content', content);
             }
         }
