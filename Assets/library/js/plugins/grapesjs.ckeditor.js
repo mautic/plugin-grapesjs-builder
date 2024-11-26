@@ -1,17 +1,11 @@
 export default (editor, opts = {}) => {
-    const options = {
-        ...opts
-    };
-
     let ckEditorInstance = null;
-    let gjsCurrentView = null;
 
     const SIMPLE_EDITING_TYPES = ['mj-button', 'link'];
 
     editor.on('rte:enable', (view, gjsRte) => {
-        gjsCurrentView = view;
         if (!isSimpleEditingEl(view.el)) {
-            initializeModal(gjsRte.el);
+            openCKEditorModal(gjsRte.el, view);
             editor.RichTextEditor.hideToolbar();
         }
     });
@@ -20,23 +14,34 @@ export default (editor, opts = {}) => {
         return el && el.getAttribute && SIMPLE_EDITING_TYPES.includes(el.getAttribute('data-gjs-type'));
     }
 
-    function initializeModal(el) {
-        const ckEditorElementId = generateId('ckeditor');
+    function openCKEditorModal(el, view) {
+        const ckEditorElementId = `ckeditor-${Date.now()}`;
         const modal = editor.Modal;
-        setupModalEvents(modal, ckEditorElementId);
-        openModal(modal, el, ckEditorElementId);
-    }
 
-    function setupModalEvents(modal, ckEditorElementId) {
         modal.onceOpen(() => initCKEditor(ckEditorElementId));
         modal.onceClose(() => destroyCKEditor());
+
+        modal.open({
+            title: 'Edit',
+            content: `
+                <div id="${ckEditorElementId}">${el.innerHTML}</div>
+                <button type="button" class="gjs-btn-prim" id="gjs-cke-save-btn">Save</button>
+                <button type="button" class="gjs-btn-prim" id="gjs-cke-close-btn">Close</button>
+            `,
+            attributes: {
+                class: 'cke-modal'
+            }
+        });
+
+        document.getElementById('gjs-cke-save-btn').onclick = () => saveContent(view, modal);
+        document.getElementById('gjs-cke-close-btn').onclick = () => modal.close();
     }
 
     function initCKEditor(elementId) {
         if (typeof ClassicEditor === 'undefined') {
             throw new Error('CKEDITOR instance not found');
         }
-        ClassicEditor.create(document.getElementById(elementId), options)
+        ClassicEditor.create(document.getElementById(elementId), opts)
             .then(instance => {
                 ckEditorInstance = instance;
             })
@@ -54,36 +59,10 @@ export default (editor, opts = {}) => {
         }
     }
 
-    function openModal(modal, el, ckEditorElementId) {
-        modal.open({
-            title: 'Edit',
-            content: getModalContent(el, ckEditorElementId),
-            attributes: {
-                class: 'cke-modal',
-                id: generateId('cke-modal')
-            }
-        });
-
-        setupModalButtons(el, modal);
-    }
-
-    function getModalContent(el, ckEditorElementId) {
-        return `
-            <div id="${ckEditorElementId}">${el.innerHTML}</div>
-            <button type="button" class="gjs-btn-prim" id="gjs-cke-save-btn">Save</button>
-            <button type="button" class="gjs-btn-prim" id="gjs-cke-close-btn">Close</button>
-        `;
-    }
-
-    function setupModalButtons(el, modal) {
-        document.getElementById('gjs-cke-save-btn').onclick = () => saveContent(el, modal);
-        document.getElementById('gjs-cke-close-btn').onclick = () => modal.close();
-    }
-
-    function saveContent(el, modal) {
+    function saveContent(view, modal) {
         if (ckEditorInstance) {
             const content = ckEditorInstance.getData();
-            const selectedElement = gjsCurrentView.model;
+            const selectedElement = view.model;
             const currentContent = selectedElement.get('content');
             if (currentContent !== content) {
                 // Clear existing components to avoid conflicts
@@ -93,9 +72,5 @@ export default (editor, opts = {}) => {
             }
         }
         modal.close();
-    }
-
-    function generateId(prefix = 'el') {
-        return `${prefix}-${Math.random().toString(36).substring(2, 10)}`;
     }
 };
