@@ -86,7 +86,8 @@ function setThemeHtml(theme) {
 
       // If MJML template, generate HTML before save
       if (!textareaHtml.val().length && textareaMjml.val().length) {
-        const builder = new BuilderService(AssetService.getAssetsConfig());
+        const assetService = new AssetService();
+        const builder = new BuilderService(assetService);
 
         textareaHtml.val(builder.mjmlToHtml(response.templateMjml));
       }
