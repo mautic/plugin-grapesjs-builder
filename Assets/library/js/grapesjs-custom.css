@@ -366,8 +366,8 @@ html {
 /* CKEditor styles */
 .cke-modal .ck-editor .ck-content {
   min-height: 400px;
-  background: #FFF;
-  color: #000;
+  background: var(--background);
+  color: var(--text-primary);
 }
 
 .cke-modal .gjs-btn-prim {
