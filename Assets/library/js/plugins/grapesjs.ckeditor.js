@@ -33,6 +33,9 @@ export default (editor, opts = {}) => {
             }
         });
 
+        const { backgroundColor, color } = getRealColors(el);
+        setEditorStyle(color, backgroundColor);
+
         document.getElementById('gjs-cke-save-btn').onclick = () => saveContent(view, modal);
         document.getElementById('gjs-cke-close-btn').onclick = () => modal.close();
     }
@@ -73,4 +76,54 @@ export default (editor, opts = {}) => {
         }
         modal.close();
     }
+
+    function setEditorStyle(color, backgroundColor) {
+        const STYLE_ID = 'gjs-ckeditor-styles';
+        let styleElement = document.getElementById(STYLE_ID);
+
+        if (!styleElement) {
+            styleElement = document.createElement('style');
+            styleElement.id = STYLE_ID;
+            document.head.appendChild(styleElement);
+        }
+
+        styleElement.innerHTML = `
+            .cke-modal .ck-editor .ck-content {
+                background: ${backgroundColor};
+                color: ${color};
+            }
+        `;
+    }
+
+    function getRealColors(elem, maxDepth = 100) {
+        const transparent = ['rgba(0, 0, 0, 0)', 'transparent'];
+        const defaults = { backgroundColor: 'rgba(0, 0, 0, 0)', color: 'rgb(0, 0, 0)' };
+
+        function getColors(el, depth) {
+            if (!el || depth <= 0) return defaults;
+            try {
+                const style = getComputedStyle(el);
+                const bg = style.backgroundColor;
+                const color = style.color;
+                const result = {};
+
+                if (!transparent.includes(bg)) result.backgroundColor = bg;
+                if (color && !transparent.includes(color)) result.color = color;
+
+                if (result.backgroundColor && result.color) return result;
+
+                const parentColors = getColors(el.parentElement, depth - 1);
+                return {
+                    backgroundColor: result.backgroundColor || parentColors.backgroundColor,
+                    color: result.color || parentColors.color
+                };
+            } catch (error) {
+                console.warn('Error computing colors:', error);
+                return defaults;
+            }
+        }
+
+        return getColors(elem, maxDepth);
+    }
+
 };
