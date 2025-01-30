@@ -20,13 +20,14 @@ export default (editor, opts = {}) => {
 
         modal.onceOpen(() => initCKEditor(ckEditorElementId));
         modal.onceClose(() => destroyCKEditor());
-
+        modal.config.backdrop = false;
         modal.open({
             title: 'Edit',
             content: `
                 <div id="${ckEditorElementId}">${el.innerHTML}</div>
-                <button type="button" class="gjs-btn-prim" id="gjs-cke-save-btn">Save</button>
-                <button type="button" class="gjs-btn-prim" id="gjs-cke-close-btn">Close</button>
+                <button type="button" class="gjs-btn-prim" id="gjs-cke-save-btn">Apply</button>
+                <button type="button" class="gjs-btn-prim" id="gjs-cke-save-n-close-btn">Apply & Close</button>
+                <button type="button" class="gjs-btn-prim" id="gjs-cke-close-btn">Cancel</button>
             `,
             attributes: {
                 class: 'cke-modal'
@@ -36,7 +37,11 @@ export default (editor, opts = {}) => {
         const { backgroundColor, color } = getRealColors(el);
         setEditorStyle(color, backgroundColor);
 
-        document.getElementById('gjs-cke-save-btn').onclick = () => saveContent(view, modal);
+        document.getElementById('gjs-cke-save-btn').onclick = () => saveContent(view);
+        document.getElementById('gjs-cke-save-n-close-btn').onclick = () => {
+            saveContent(view);
+            modal.close();
+        }
         document.getElementById('gjs-cke-close-btn').onclick = () => modal.close();
     }
 
@@ -62,7 +67,7 @@ export default (editor, opts = {}) => {
         }
     }
 
-    function saveContent(view, modal) {
+    function saveContent(view) {
         if (ckEditorInstance) {
             const content = ckEditorInstance.getData();
             const selectedElement = view.model;
@@ -74,7 +79,6 @@ export default (editor, opts = {}) => {
                 selectedElement.set('content', content);
             }
         }
-        modal.close();
     }
 
     function setEditorStyle(color, backgroundColor) {
