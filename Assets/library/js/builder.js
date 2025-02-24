@@ -135,7 +135,6 @@ function switchBuilderButton(theme) {
  * @param theme
  */
 function switchCustomHtml(theme) {
-  console.log(theme)
   const customHtmlRow = mQuery('#custom-html-row');
   const isPageMode = mQuery('[name="page"]').length !== 0;
   const isCodeMode = theme === 'mautic_code_mode';
@@ -157,7 +156,6 @@ function initSelectThemeGrapesjs(parentInitSelectTheme) {
   function childInitSelectTheme(themeField) {
     const builderUrl = mQuery('#builder_url');
     let url;
-    console.log(themeField)
 
     switchBuilderButton(themeField.val());
     switchCustomHtml(themeField.val());
