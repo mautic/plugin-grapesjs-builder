@@ -86,7 +86,8 @@ function setThemeHtml(theme) {
 
       // If MJML template, generate HTML before save
       if (!textareaHtml.val().length && textareaMjml.val().length) {
-        const builder = new BuilderService(AssetService.getAssetsConfig());
+        const assetService = new AssetService();
+        const builder = new BuilderService(assetService);
 
         textareaHtml.val(builder.mjmlToHtml(response.templateMjml));
       }
@@ -174,7 +175,8 @@ function initSelectThemeGrapesjs(parentInitSelectTheme) {
     parentInitSelectTheme(themeField);
 
     mQuery('[data-theme]').click((event) => {
-      const theme = mQuery(event.target).attr('data-theme');
+      const target = mQuery(event.target);
+      const theme = target.closest('[data-theme]').attr('data-theme');
 
       switchBuilderButton(theme);
       switchCustomHtml(theme);
