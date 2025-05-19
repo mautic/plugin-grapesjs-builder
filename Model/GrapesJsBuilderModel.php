@@ -69,7 +69,7 @@ class GrapesJsBuilderModel extends AbstractCommonModel
         }
 
         $currentRequest = $this->requestStack->getCurrentRequest();
-        if ($currentRequest && $this->requestStack->getCurrentRequest()->request->has('grapesjsbuilder')) {
+        if ($currentRequest && $currentRequest->request->has('grapesjsbuilder')) {
             $data = $this->requestStack->getCurrentRequest()->get('grapesjsbuilder', '');
 
             if (isset($data['customMjml'])) {
