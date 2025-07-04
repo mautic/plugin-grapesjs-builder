@@ -46,13 +46,13 @@ export default class CompCopyPaste {
     let components = JSON.parse(window.localStorage.getItem(this.storage_key));
     if (components) {
       if (selected && selected.attributes.type !== 'wrapper') {
-        var index = selected.index();
+        const index = selected.index();
         // Invert the order so last item gets added first and gets pushed down as others get added.
         components.reverse();
-        var currentSelection = selected.collection;
+        const currentSelection = selected.collection;
         components.forEach((comp) => {
           if (currentSelection) {
-            var added = currentSelection.add(comp, { at: index + 1 });
+            const added = currentSelection.add(comp, { at: index + 1 });
             editor.trigger('component:paste', added);
             this.setStyles(added);
           }
