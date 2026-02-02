@@ -19,11 +19,103 @@ function launchBuilderGrapesjs(formName) {
 
   // Prepare HTML
   mQuery('html').css('font-size', '100%');
+  function getBuilderContext() {
+    const builderUrlValue = mQuery('#builder_url').val();
+    if (!builderUrlValue) {
+      return null;
+    }
+
+    let url;
+    try {
+      url = new URL(builderUrlValue, window.location.origin);
+    } catch (error) {
+      console.warn('Unable to parse builder URL', error);
+      return null;
+    }
+
+    const match = url.pathname.match(/grapesjsbuilder\/(page|email)\/([^/]+)/);
+    if (!match) {
+      return null;
+    }
+
+    const [, objectType, objectId] = match;
+
+    return {
+      url,
+      objectType,
+      objectId,
+      isNew: objectId.startsWith('new'),
+    };
+  }
+
+  function purgeLocalProjectStorage(entityId) {
+    if (!entityId) {
+      return;
+    }
+
+    const storageKey = 'gjs-storage';
+    let stack;
+
+    try {
+      stack = JSON.parse(localStorage.getItem(storageKey));
+    } catch (error) {
+      console.warn('Unable to parse local GrapesJS storage stack', error);
+      return;
+    }
+
+    if (!Array.isArray(stack)) {
+      return;
+    }
+
+    const filtered = stack.filter((item) => {
+      if (!item || !item.id || typeof item.id !== 'string') {
+        return true;
+      }
+
+      return !item.id.endsWith(`-${entityId}`);
+    });
+
+    if (filtered.length === stack.length) {
+      return;
+    }
+
+    localStorage.setItem(storageKey, JSON.stringify(filtered));
+  }
+
+  async function resetStoredProjectData(context) {
+    if (!context || context.isNew) {
+      return;
+    }
+
+    const resetUrl = `${context.url.origin}${context.url.pathname}/project/reset`;
+
+    try {
+      await fetch(resetUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-Token': typeof mauticAjaxCsrf !== 'undefined' ? mauticAjaxCsrf : '',
+        },
+        body: '{}',
+      });
+    } catch (error) {
+      console.warn('Unable to reset stored GrapesJS project data', error);
+    }
+
+    purgeLocalProjectStorage(context.objectId);
+  }
+
   mQuery('body').css('overflow-y', 'hidden');
   mQuery('.builder-panel').css('padding', 0);
   mQuery('.builder-panel').css('display', 'block');
   const $builder = mQuery('.builder');
   $builder.addClass('builder-active').removeClass('hide');
+
+  const context = getBuilderContext();
+  // Ensure stale local/editor state is cleared when reopening existing entities
+  //void resetStoredProjectData(context);
 
   const assetService = new AssetService();
   const builder = new BuilderService(assetService);
@@ -52,7 +144,6 @@ function launchBuilderGrapesjs(formName) {
 function useBuilderForCodeMode() {
   const theme = mQuery('.theme-selected').find('[data-theme]').attr('data-theme');
   const isCodeMode = theme === 'mautic_code_mode';
-
   if (isCodeMode) {
     if (confirm(Mautic.translate('grapesjsbuilder.builder.warning.code_mode')) === false) {
       return false;
@@ -72,16 +163,29 @@ function setThemeHtml(theme) {
   // Load template and fill field
   mQuery.ajax({
     url: mQuery('#builder_url').val(),
-    data: `template=${theme}`,
+    data: {
+      template: theme,
+      resetProject: 1,
+    },
     dataType: 'json',
     success(response) {
       const textareaHtml = mQuery('textarea.builder-html');
       const textareaMjml = mQuery('textarea.builder-mjml');
+      const textareaJson = mQuery('textarea.builder-json');
+      const form = textareaHtml.closest('form');
 
       textareaHtml.val(response.templateHtml);
 
       if (typeof textareaMjml !== 'undefined') {
         textareaMjml.val(response.templateMjml);
+      }
+
+      if (textareaJson.length) {
+        textareaJson.val('');
+      }
+
+      if (form.length) {
+        form.attr('data-grapesjsbuilder-reset', 'true');
       }
 
       // If MJML template, generate HTML before save

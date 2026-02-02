@@ -10,7 +10,7 @@ import grapesjstouch from 'grapesjs-touch';
 import grapesjstuiimageeditor from 'grapesjs-tui-image-editor';
 import grapesjsstylebg from 'grapesjs-style-bg';
 import grapesjspostcss from 'grapesjs-parser-postcss';
-import grapesjsckeditor from './plugins/grapesjs.ckeditor';
+import grapesjsckeditor from './plugins/grapesjs.ckeditor.new';
 import contentService from 'grapesjs-preset-mautic/dist/content.service';
 import grapesjsmautic from 'grapesjs-preset-mautic';
 import editorFontsService from 'grapesjs-preset-mautic/dist/editorFonts/editorFonts.service';
@@ -23,6 +23,7 @@ import StorageService from './storage.service';
 import CodeModeButton from './codeMode/codeMode.button';
 import CompCopyPaste from './commands/compCopyPaste';
 import MjmlService from 'grapesjs-preset-mautic/dist/mjml/mjml.service';
+import MjmlStylesService from './mjmlStyles.service';
 
 export default class BuilderService {
   editor;
@@ -31,11 +32,241 @@ export default class BuilderService {
 
   assetService;
 
+  projectField;
+
+  pendingProjectData;
+
+  context;
+
+  projectDataLoaded;
+
+  typographySector;
+
+  typographySectorInitialized;
+
+  typographySectorTimeout;
+
   /**
    * @param {AssetService} assetService
    */
   constructor(assetService) {
     this.assetService = assetService;
+    this.projectField = null;
+    this.pendingProjectData = null;
+    this.context = null;
+    this.projectDataLoaded = false;
+    this.typographySector = null;
+    this.typographySectorInitialized = false;
+    this.typographySectorTimeout = null;
+
+    this.patchMjmlService();
+  }
+
+  patchMjmlService() {
+    if (!MjmlService || typeof MjmlService.getEditorMjmlContent !== 'function') {
+      return;
+    }
+
+    if (MjmlService.__gjsBuilderListStylesPatched) {
+      return;
+    }
+
+    const originalGetEditorMjmlContent = MjmlService.getEditorMjmlContent.bind(MjmlService);
+
+    MjmlService.getEditorMjmlContent = (editor) => {
+      const mjml = originalGetEditorMjmlContent(editor);
+      return MjmlStylesService.normalizeListStyles(mjml);
+    };
+
+    MjmlService.__gjsBuilderListStylesPatched = true;
+  }
+
+  /**
+   * Initialize GrapesJsBuilder
+   *
+   * @param object
+   */
+  getContext(object) {
+    const isPage = object === 'page';
+    const formName = isPage ? 'page' : 'emailform';
+    const form = document.querySelector(`form[name="${formName}"]`);
+    const sessionFieldId = isPage ? 'page_sessionId' : 'emailform_sessionId';
+    const sessionInput = document.getElementById(sessionFieldId);
+    const sessionValue = sessionInput ? sessionInput.value : '';
+    const entityId = sessionValue && !sessionValue.startsWith('new_') ? sessionValue : null;
+
+    return {
+      form,
+      formName,
+      sessionId: sessionValue || null,
+      entityId,
+      objectType: isPage ? 'page' : 'email',
+      resetProject: !!(form && form.dataset && form.dataset.grapesjsbuilderReset === 'true'),
+    };
+  }
+
+  ensureProjectField(context) {
+    if (!context || !context.form) {
+      return null;
+    }
+
+    const existing = context.form.querySelector('textarea.builder-json[name="grapesjsbuilder[projectData]"]');
+    if (existing) {
+      return existing;
+    }
+
+    const field = document.createElement('textarea');
+    field.name = 'grapesjsbuilder[projectData]';
+    field.id = 'grapesjsbuilder_projectData';
+    field.className = 'builder-json hide';
+    field.style.display = 'none';
+    context.form.appendChild(field);
+
+    return field;
+  }
+
+  setProjectFieldValue(value) {
+    if (!this.projectField) {
+      return;
+    }
+
+    this.projectField.value = value;
+  }
+
+  safeParseProjectData(value) {
+    if (!value || !value.trim()) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(value);
+      return typeof parsed === 'object' && parsed !== null ? parsed : null;
+    } catch (error) {
+      console.warn('Unable to parse GrapesJS project data from field', error);
+      return null;
+    }
+  }
+
+  async prefillProjectField(context) {
+    if (!context) {
+      this.setProjectFieldValue('');
+      return null;
+    }
+
+    if (context.resetProject) {
+      this.setProjectFieldValue('');
+      return null;
+    }
+
+    if (!context.entityId) {
+      this.setProjectFieldValue('');
+      return null;
+    }
+
+    const baseUrl = typeof mauticBaseUrl === 'string' && mauticBaseUrl.length > 0 ? mauticBaseUrl : '/';
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    const requestUrl = new URL(`s/grapesjsbuilder/${context.objectType}/${context.entityId}/project`, `${window.location.origin}${normalizedBase}`);
+    const route = requestUrl.toString();
+
+    try {
+      const response = await fetch(route, {
+        credentials: 'same-origin',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
+
+      if (!response.ok) {
+        this.setProjectFieldValue('');
+        return null;
+      }
+
+      const payload = await response.json();
+      const projectData = (payload && typeof payload === 'object') ? payload.projectData : null;
+
+      if (typeof projectData === 'string') {
+        const parsed = this.safeParseProjectData(projectData);
+        if (parsed) {
+          const serializedFromString = JSON.stringify(parsed);
+          this.setProjectFieldValue(serializedFromString);
+          if (context.form) {
+            context.form.dataset.grapesjsbuilderReset = 'false';
+          }
+          context.resetProject = false;
+          return parsed;
+        }
+
+        this.setProjectFieldValue(projectData);
+
+        return null;
+      }
+
+      if (projectData && typeof projectData === 'object') {
+        const serialized = JSON.stringify(projectData);
+        this.setProjectFieldValue(serialized);
+        if (context.form) {
+          context.form.dataset.grapesjsbuilderReset = 'false';
+        }
+        context.resetProject = false;
+        return projectData;
+      }
+
+      this.setProjectFieldValue('');
+
+      return null;
+    } catch (error) {
+      console.warn('Unable to fetch GrapesJS project data', error);
+      this.setProjectFieldValue('');
+
+      return null;
+    }
+  }
+
+  loadProjectData(projectData) {
+    if (!projectData || !this.editor || typeof this.editor.loadProjectData !== 'function') {
+      return;
+    }
+
+    try {
+      this.editor.loadProjectData(projectData);
+      this.projectDataLoaded = true;
+    } catch (error) {
+      console.warn('Unable to load GrapesJS project data into the editor', error);
+    }
+  }
+
+  persistProjectData() {
+    if (!this.projectField || !this.editor || typeof this.editor.getProjectData !== 'function') {
+      return;
+    }
+
+    try {
+      const projectData = this.editor.getProjectData();
+      if (projectData && typeof projectData === 'object') {
+        const serialized = JSON.stringify(projectData);
+        this.setProjectFieldValue(serialized);
+        this.pendingProjectData = projectData;
+        this.projectDataLoaded = true;
+        if (this.context && this.context.form) {
+          this.context.form.dataset.grapesjsbuilderReset = 'false';
+        }
+        if (this.context) {
+          this.context.resetProject = false;
+        }
+      } else {
+        this.setProjectFieldValue('');
+        this.pendingProjectData = null;
+        this.projectDataLoaded = false;
+        if (this.context && this.context.form) {
+          this.context.form.dataset.grapesjsbuilderReset = 'false';
+        }
+        if (this.context) {
+          this.context.resetProject = false;
+        }
+      }
+    } catch (error) {
+      console.warn('Unable to collect GrapesJS project data from the editor', error);
+    }
   }
 
   /**
@@ -89,10 +320,6 @@ export default class BuilderService {
       });
     });
 
-    this.editor.on('asset:upload:error', (error) => {
-      Mautic.setFlashes(Mautic.addErrorFlashMessage(error));
-    });
-
     this.editor.on('asset:open', () => {
       const editor = this.editor;
       const assetsService = this.assetService;
@@ -130,7 +357,7 @@ export default class BuilderService {
           }
         };
 
-        assetsContainer.addEventListener('scroll', function() {
+        assetsContainer.addEventListener('scroll', function () {
           const hasScrolledToBottom = this.scrollTop + this.clientHeight >= this.scrollHeight - 5;
           if (hasScrolledToBottom && !assetsService.hasLoadedAllAssets()) {
             loadNextPage();
@@ -142,14 +369,27 @@ export default class BuilderService {
     });
 
     const triggerBuilderHide = () => {
+      this.persistProjectData();
       // trigger hide event on DOM element
       mQuery('.builder').trigger('builder:hide', [this.editor]);
       // trigger hide event on editor instance
       this.editor.trigger('hide');
     };
+    
+    if (this.context && this.context.form) {
+      const $form = mQuery(this.context.form);
+      $form
+        .off('submit.grapesjsbuilder form-pre-serialize.grapesjsbuilder')
+        .on('submit.grapesjsbuilder', () => this.persistProjectData())
+        .on('form-pre-serialize.grapesjsbuilder', () => this.persistProjectData());
+    }
     this.editor.on('run:mautic-editor-page-html-close', triggerBuilderHide);
     this.editor.on('run:mautic-editor-email-html-close', triggerBuilderHide);
     this.editor.on('run:mautic-editor-email-mjml-close', triggerBuilderHide);
+    this.editor.on('run:preset-mautic:apply-form', () => this.persistProjectData());
+
+    this.editor.on('load', () => this.setupTypographySectorVisibility());
+    this.setupTypographySectorVisibility();
 
     // add offset to flashes container for better UI visibility when builder is on
     this.editor.on('show', () => mQuery('#flashes').addClass('alert-offset'));
@@ -161,6 +401,17 @@ export default class BuilderService {
    * correct mode
    */
   initGrapesJS(object) {
+    this.context = this.getContext(object);
+    this.projectField = this.ensureProjectField(this.context);
+    this.pendingProjectData = this.safeParseProjectData(this.projectField ? this.projectField.value : '');
+    this.projectDataLoaded = false;
+
+    const projectPrefetch = this.context.resetProject
+      ? null
+      : (this.pendingProjectData
+        ? Promise.resolve(this.pendingProjectData)
+        : this.prefillProjectField(this.context));
+
     // grapesjs-custom-plugins: add globally defined mautic-grapesjs-plugins using name as pluginId for the plugin-function
     if (window.MauticGrapesJsPlugins) {
       window.MauticGrapesJsPlugins.forEach((item) => {
@@ -192,6 +443,32 @@ export default class BuilderService {
       throw Error(`Not supported builder type: ${object}`);
     }
 
+    this.editor.on('load', () => {
+      if (!this.projectDataLoaded && this.pendingProjectData) {
+        this.loadProjectData(this.pendingProjectData);
+      }
+    });
+
+    if (projectPrefetch && typeof projectPrefetch.then === 'function') {
+      projectPrefetch.then((projectData) => {
+        if (projectData && typeof projectData === 'object') {
+          this.pendingProjectData = projectData;
+          if (!this.projectDataLoaded && this.editor) {
+            this.loadProjectData(projectData);
+          }
+        }
+      });
+    }
+
+    if (this.context.resetProject) {
+      this.setProjectFieldValue('');
+      this.pendingProjectData = null;
+      if (this.context.form) {
+        this.context.form.dataset.grapesjsbuilderReset = 'false';
+      }
+      this.context.resetProject = false;
+    }
+
     // add code mode button
     // @todo: only show button if configured: sourceEdit: 1,
     const codeModeButton = new CodeModeButton(this.editor);
@@ -215,8 +492,145 @@ export default class BuilderService {
   }
 
   static getCkeConf(tokenCallback) {
-    const ckEditorToolbarOptions = ['undo', 'redo', '|', 'bold','italic', 'underline','strikethrough', '|', 'fontSize','fontFamily','fontColor','fontBackgroundColor', '|' ,'alignment','outdent', 'indent', '|', 'blockQuote', 'insertTable', '|', 'bulletedList','numberedList', '|', 'link', '|', 'TokenPlugin'];
-    return Mautic.GetCkEditorConfigOptions(ckEditorToolbarOptions, tokenCallback);
+    const blockToolbar = ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'alignment', 'outdent', 'indent', '|', 'bulletedList', 'numberedList', '|', 'link', '|', 'TokenPlugin', 'heading'];
+
+    const blockConfig = Mautic.GetCkEditorConfigOptions(blockToolbar, tokenCallback) || {};
+
+    blockConfig.licenseKey = 'GPL';
+
+    if (blockConfig.toolbar) {
+      blockConfig.toolbar = {
+        ...blockConfig.toolbar,
+        items: blockToolbar,
+        shouldNotGroupWhenFull: true,
+      };
+    }
+
+    const linkConfig = blockConfig.link ? { ...blockConfig.link } : {};
+    const decorators = linkConfig.decorators ? { ...linkConfig.decorators } : {};
+    const existingOpenInNewTab = decorators.openInNewTab && typeof decorators.openInNewTab === 'object'
+      ? decorators.openInNewTab
+      : {};
+
+    const normalizeRel = (value) => {
+      const tokens = new Set();
+
+      if (typeof value === 'string') {
+        value.split(/\s+/).forEach((token) => {
+          const trimmed = token.trim();
+          if (trimmed) {
+            tokens.add(trimmed);
+          }
+        });
+      }
+
+      tokens.add('noopener');
+      tokens.add('noreferrer');
+
+      return Array.from(tokens).join(' ');
+    };
+
+    const mode = typeof existingOpenInNewTab.mode === 'string' ? existingOpenInNewTab.mode : 'manual';
+    const label = typeof existingOpenInNewTab.label === 'string' && existingOpenInNewTab.label.trim()
+      ? existingOpenInNewTab.label
+      : 'Open in new tab';
+    const attributes = {
+      ...(existingOpenInNewTab.attributes || {}),
+      target: '_blank',
+      rel: normalizeRel(existingOpenInNewTab.attributes && existingOpenInNewTab.attributes.rel),
+    };
+
+    const openInNewTabDecorator = {
+      ...existingOpenInNewTab,
+      mode,
+      label,
+      attributes,
+    };
+
+    if (mode === 'manual') {
+      openInNewTabDecorator.defaultValue = true;
+    }
+
+    decorators.openInNewTab = openInNewTabDecorator;
+    linkConfig.decorators = decorators;
+    blockConfig.link = linkConfig;
+
+    if (blockConfig.dynamicToken) {
+      blockConfig.dynamicToken = [
+        {
+          id: 'token-tip',
+          name: "Tip: Type '{' directly in the editor to search for tokens!"
+        },
+        ...blockConfig.dynamicToken.filter(t => t.id !== 'token-tip')
+      ];
+    }
+
+    return blockConfig;
+  }
+
+  static getCkeditorModuleUrl() {
+    const baseUrl = typeof mauticBaseUrl !== 'undefined' ? mauticBaseUrl : '';
+
+    return `${baseUrl}media/libraries/ckeditor/ckeditor.js`;
+  }
+
+  static getInlineElements() {
+    return ['span', 'a', 'button', 'label', 'strong', 'em', 'small', 'sup', 'sub', 'h1', 'h2', 'h3', 'h4', 'h5'];
+  }
+
+  static buildInlineCkeConf(baseOptions) {
+    const inlineToolbar = ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'link', '|', 'removeFormat', '|', 'TokenPlugin', 'heading'];
+
+    const options = baseOptions ? { ...baseOptions } : {};
+    const toolbarConfig = baseOptions && baseOptions.toolbar ? { ...baseOptions.toolbar } : {};
+
+    toolbarConfig.items = inlineToolbar;
+    toolbarConfig.shouldNotGroupWhenFull = true;
+    options.toolbar = toolbarConfig;
+
+    if (options.dynamicToken) {
+      options.dynamicToken = [
+        {
+          id: 'token-tip',
+          name: "Tip: Type '{' directly in the editor to search for tokens!"
+        },
+        ...options.dynamicToken.filter(t => t.id !== 'token-tip')
+      ];
+    }
+
+    return options;
+  }
+
+  static getActiveThemeAlias() {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return null;
+    }
+
+    const { Mautic: mauticGlobal } = window;
+    if (mauticGlobal && typeof mauticGlobal.builderTheme === 'string') {
+      const fromGlobal = mauticGlobal.builderTheme.trim();
+      if (fromGlobal) {
+        return fromGlobal;
+      }
+    }
+
+    const templateField = document.querySelector('[name$="[template]"]');
+    if (templateField && typeof templateField.value === 'string') {
+      const fromField = templateField.value.trim();
+      if (fromField) {
+        return fromField;
+      }
+    }
+
+    const selectedTheme = document.querySelector('.theme-selected [data-theme]');
+    if (selectedTheme) {
+      const fromSelection = selectedTheme.getAttribute('data-theme');
+      if (typeof fromSelection === 'string' && fromSelection.trim()) {
+        return fromSelection.trim();
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -224,13 +638,21 @@ export default class BuilderService {
    */
   initPage() {
     // Launch GrapesJS with body part
+    const ckeditorModuleUrl = BuilderService.getCkeditorModuleUrl();
+    const inlineElements = BuilderService.getInlineElements();
+    const pageCkEditorOptions = BuilderService.getCkeConf('page:getBuilderTokens');
+    const pageInlineOptions = BuilderService.buildInlineCkeConf(pageCkEditorOptions);
+
     this.editor = grapesjs.init({
       clearOnRender: true,
       container: '.builder-panel',
       components: contentService.getOriginalContentHtml().body.innerHTML,
       height: '100%',
       canvas: {
-        styles: contentService.getStyles(),
+        styles: [
+          ...contentService.getStyles(),
+          `${mauticBaseUrl}plugins/GrapesJsBuilderBundle/Assets/library/js/grapesjs-editor.css`
+        ],
       },
       storageManager: false, // https://grapesjs.com/docs/modules/Storage.html#basic-configuration
       assetManager: this.getAssetManagerConf(),
@@ -259,7 +681,17 @@ export default class BuilderService {
           useCustomTheme: false,
         },
         grapesjsmautic: BuilderService.getMauticConf('page-html'),
-        [grapesjsckeditor]: BuilderService.getCkeConf('page:getBuilderTokens'),
+        [grapesjsckeditor]: {
+          ckeditor_module: ckeditorModuleUrl,
+          licenseKey: 'GPL',
+          inlineMode: true,
+          inline: inlineElements,
+          inline_options: pageInlineOptions,
+          options: pageCkEditorOptions,
+          toolbar_max_width: '445px',
+          inline_toolbar_max_width: '360px',
+          theme_alias: BuilderService.getActiveThemeAlias(),
+        },
         ...BuilderService.getPluginOptions('page'), // grapesjs-custom-plugins: add the plugin-options
       },
     });
@@ -269,13 +701,13 @@ export default class BuilderService {
   }
 
   mjmlToHtml(mjml) {
-      const converted = MjmlService.mjmlToHtml(mjml);
+    const converted = MjmlService.mjmlToHtml(mjml);
 
-      if (0 === converted.errors.length) {
-          return converted.html;
-      }
+    if (0 === converted.errors.length) {
+      return converted.html;
+    }
 
-      return '';
+    return '';
   }
 
   initEmailMjml() {
@@ -286,6 +718,11 @@ export default class BuilderService {
     const styles = [
       `${mauticBaseUrl}plugins/GrapesJsBuilderBundle/Assets/library/js/grapesjs-editor.css`
     ];
+
+    const ckeditorModuleUrl = BuilderService.getCkeditorModuleUrl();
+    const inlineElements = BuilderService.getInlineElements();
+    const emailCkEditorOptions = BuilderService.getCkeConf('email:getBuilderTokens');
+    const emailInlineOptions = BuilderService.buildInlineCkeConf(emailCkEditorOptions);
 
     this.editor = grapesjs.init({
       selectorManager: {
@@ -313,7 +750,17 @@ export default class BuilderService {
           useCustomTheme: false,
         },
         grapesjsmautic: BuilderService.getMauticConf('email-mjml'),
-        [grapesjsckeditor]: BuilderService.getCkeConf('email:getBuilderTokens'),
+        [grapesjsckeditor]: {
+          ckeditor_module: ckeditorModuleUrl,
+          licenseKey: 'GPL',
+          inlineMode: true,
+          inline: inlineElements,
+          inline_options: emailInlineOptions,
+          options: emailCkEditorOptions,
+          toolbar_max_width: '445px',
+          inline_toolbar_max_width: '360px',
+          theme_alias: BuilderService.getActiveThemeAlias(),
+        },
         ...BuilderService.getPluginOptions('email-mjml'),
       },
     });
@@ -342,7 +789,7 @@ export default class BuilderService {
     // This can be reverted once the issue with self-closing tags is resolved in grapesjs-mjml.
     // See: https://github.com/GrapesJS/mjml/issues/149
     const voidTypes = ['mj-image', 'mj-divider', 'mj-font', 'mj-spacer'];
-    voidTypes.forEach(function(component) {
+    voidTypes.forEach(function (component) {
       editor.DomComponents.addType(component, {
         model: {
           defaults: {
@@ -364,8 +811,8 @@ export default class BuilderService {
 
             // Add the components after the closing tag
             const componentsHtml = this.get('components')
-                .map(model => model.toHTML())
-                .join('');
+              .map(model => model.toHTML())
+              .join('');
             return html + componentsHtml;
           },
         }
@@ -382,6 +829,11 @@ export default class BuilderService {
     const styles = [
       `${mauticBaseUrl}plugins/GrapesJsBuilderBundle/Assets/library/js/grapesjs-editor.css`
     ];
+
+    const ckeditorModuleUrl = BuilderService.getCkeditorModuleUrl();
+    const inlineElements = BuilderService.getInlineElements();
+    const emailCkEditorOptions = BuilderService.getCkeConf('email:getBuilderTokens');
+    const emailInlineOptions = BuilderService.buildInlineCkeConf(emailCkEditorOptions);
 
     // Launch GrapesJS with body part
     this.editor = grapesjs.init({
@@ -400,7 +852,16 @@ export default class BuilderService {
           useCustomTheme: false,
         },
         grapesjsmautic: BuilderService.getMauticConf('email-html'),
-        [grapesjsckeditor]: BuilderService.getCkeConf('email:getBuilderTokens'),
+        [grapesjsckeditor]: {
+          ckeditor_module: ckeditorModuleUrl,
+          inlineMode: true,
+          inline: inlineElements,
+          inline_options: emailInlineOptions,
+          options: emailCkEditorOptions,
+          toolbar_max_width: '445px',
+          inline_toolbar_max_width: '360px',
+          theme_alias: BuilderService.getActiveThemeAlias(),
+        },
         ...BuilderService.getPluginOptions('email-html'),
       },
     });
@@ -522,16 +983,16 @@ export default class BuilderService {
     const blocks = this.editor.BlockManager.getAll();
     blocks.map(block => {
       // columns go into a new category, at the top
-      if(block.attributes.id.indexOf('column') !== -1) {
+      if (block.attributes.id.indexOf('column') !== -1) {
         this.editor.BlockManager.get(block.attributes.id).set('category', {
-          label:"Sections",
+          label: "Sections",
           order: -1
         });
       }
       // 'Blocks' category goes after 'Basic'
-      if(block.attributes.category === 'Basic') {
+      if (block.attributes.category === 'Basic') {
         this.editor.BlockManager.get(block.attributes.id).set('category', {
-          label:"Basic",
+          label: "Basic",
           order: -1
         });
       }
@@ -546,5 +1007,127 @@ export default class BuilderService {
     if (rawblock !== null) {
       this.editor.BlockManager.remove(rawblock);
     }
+  }
+
+  setupTypographySectorVisibility() {
+    if (!this.editor || this.typographySectorInitialized) {
+      return;
+    }
+
+    const styleManager = this.editor.StyleManager;
+    if (!styleManager || typeof styleManager.getSector !== 'function') {
+      return;
+    }
+
+    const sector = styleManager.getSector('typography');
+    if (!sector) {
+      return;
+    }
+
+    this.typographySector = sector;
+    // Delay updates slightly so GrapesJS finishes its own selection bookkeeping before we toggle the sector.
+    const scheduleUpdate = (target, delay) => this.scheduleTypographySectorVisibilityUpdate(target, delay);
+    const selectionDelay = 15;
+
+    this.editor.on('component:selected', (component) => scheduleUpdate(component, selectionDelay));
+    this.editor.on('component:deselected', () => this.scheduleTypographySectorVisibilityUpdate(null, selectionDelay));
+    this.editor.on('rte:enable', (component) => scheduleUpdate(component, selectionDelay));
+    this.editor.on('rte:disable', () => this.scheduleTypographySectorVisibilityUpdate(null, selectionDelay));
+
+    this.typographySectorInitialized = true;
+    this.scheduleTypographySectorVisibilityUpdate(null, selectionDelay);
+  }
+
+  scheduleTypographySectorVisibilityUpdate(target, delay = 0) {
+    if (!this.typographySector) {
+      return;
+    }
+
+    // Clear any queued update so only the latest selection state drives visibility.
+    if (this.typographySectorTimeout) {
+      if (typeof window !== 'undefined' && typeof window.clearTimeout === 'function') {
+        window.clearTimeout(this.typographySectorTimeout);
+      } else {
+        clearTimeout(this.typographySectorTimeout);
+      }
+    }
+
+    const clearHandle = () => {
+      this.typographySectorTimeout = null;
+    };
+
+    const run = () => {
+      clearHandle();
+      this.updateTypographySectorVisibility(target);
+    };
+
+    // Schedule with the requested delay (0 falls back to next tick).
+    const timeoutDelay = typeof delay === 'number' && delay > 0 ? delay : 0;
+
+    if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') {
+      this.typographySectorTimeout = window.setTimeout(run, timeoutDelay);
+    } else {
+      this.typographySectorTimeout = setTimeout(run, timeoutDelay);
+    }
+  }
+
+  updateTypographySectorVisibility(target = null) {
+    const styleManager = this.editor && this.editor.StyleManager;
+    if (!styleManager || typeof styleManager.getSector !== 'function') {
+      return;
+    }
+
+    const sector = styleManager.getSector('typography');
+    if (!sector) {
+      return;
+    }
+
+    this.typographySector = sector;
+
+    const component = this.resolveComponentFromTarget(target) || (this.editor && typeof this.editor.getSelected === 'function' ? this.editor.getSelected() : null);
+    const shouldHide = this.shouldHideTypographySector(component);
+
+    if (typeof sector.set === 'function') {
+      sector.set('visible', !shouldHide);
+    } else {
+      sector.visible = !shouldHide;
+    }
+
+    // Fallback: forcefully hide/show the sector in the DOM if StyleManager doesn't update the UI correctly.
+    // In GrapesJS 0.22+, the view is not directly on the model, so we find the element by searching for the id/label.
+    const sectorId = typeof sector.getId === 'function' ? sector.getId() : 'typography';
+    const editorContainer = this.editor.getContainer();
+    const sectorEl = editorContainer ? editorContainer.querySelector(`.gjs-sm-sector[id*="${sectorId}"]`) : null;
+
+    if (sectorEl) {
+      sectorEl.style.display = shouldHide ? 'none' : '';
+    } else if (sector.view && sector.view.el) {
+      // Compatibility with older GrapesJS versions
+      sector.view.el.style.display = shouldHide ? 'none' : '';
+    }
+  }
+
+  resolveComponentFromTarget(target) {
+    if (!target) {
+      return null;
+    }
+
+    if (typeof target.get === 'function' && typeof target.getId === 'function') {
+      return target;
+    }
+
+    if (target.model && typeof target.model.get === 'function') {
+      return target.model;
+    }
+
+    if (target.component && typeof target.component.get === 'function') {
+      return target.component;
+    }
+
+    return null;
+  }
+
+  shouldHideTypographySector(component) {
+    return true;
   }
 }
