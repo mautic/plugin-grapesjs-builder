@@ -10,7 +10,7 @@ import grapesjstouch from 'grapesjs-touch';
 import grapesjstuiimageeditor from 'grapesjs-tui-image-editor';
 import grapesjsstylebg from 'grapesjs-style-bg';
 import grapesjspostcss from 'grapesjs-parser-postcss';
-import grapesjsckeditor from './plugins/grapesjs.ckeditor.new';
+import grapesjsckeditor from './plugins/grapesjs-ckeditor';
 import contentService from 'grapesjs-preset-mautic/dist/content.service';
 import grapesjsmautic from 'grapesjs-preset-mautic';
 import editorFontsService from 'grapesjs-preset-mautic/dist/editorFonts/editorFonts.service';

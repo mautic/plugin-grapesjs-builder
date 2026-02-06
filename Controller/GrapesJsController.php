@@ -74,13 +74,14 @@ class GrapesJsController extends CommonController
 
         $type         = 'html';
         $template     = InputHelper::clean($request->query->get('template'));
+        $resetProject = $request->query->getBoolean('resetProject', false);
         if (!$template) {
             $mauticLogger->warning('Grapesjs: no template in query');
 
             return $this->json(false);
         }
         $templateName = '@themes/'.$template.'/html/'.$objectType;
-        $content      = $entity->getContent();
+        $content      = $resetProject ? [] : $entity->getContent();
 
         // Check for MJML template
         // @deprecated - use mjml directly in email.html.twig
@@ -118,6 +119,108 @@ class GrapesJsController extends CommonController
                 'templateMjml' => $renderedTemplateMjml,
             ]
         );
+    }
+
+    public function projectAction(
+        Request $request,
+        LoggerInterface $mauticLogger,
+        $objectType,
+        $objectId,
+    ) {
+        if (!in_array($objectType, self::OBJECT_TYPE)) {
+            throw new \Exception('Object not authorized to load custom builder', Response::HTTP_CONFLICT);
+        }
+
+        if (str_contains((string) $objectId, 'new')) {
+            return $this->json(['projectData' => null]);
+        }
+
+        $model      = $this->getModel($objectType);
+        $aclToCheck = 'email:emails:';
+
+        if ('page' === $objectType) {
+            $aclToCheck = 'page:pages:';
+        }
+
+        /** @var Email|Page|null $entity */
+        $entity = $model->getEntity((int) $objectId);
+
+        if (null === $entity
+            || !$this->security->hasEntityAccess(
+                $aclToCheck.'viewown',
+                $aclToCheck.'viewother',
+                $entity->getCreatedBy()
+            )
+        ) {
+            return $this->accessDenied();
+        }
+
+        $content     = $entity->getContent();
+        $projectData = null;
+
+        if (is_array($content)
+            && isset($content['grapesjsbuilder'])
+            && array_key_exists('projectData', $content['grapesjsbuilder'])
+        ) {
+            $projectData = $content['grapesjsbuilder']['projectData'];
+        }
+
+        return $this->json(['projectData' => $projectData]);
+    }
+
+    public function resetProjectAction(
+        Request $request,
+        LoggerInterface $mauticLogger,
+        $objectType,
+        $objectId,
+    ) {
+        if (!in_array($objectType, self::OBJECT_TYPE)) {
+            throw new \Exception('Object not authorized to load custom builder', Response::HTTP_CONFLICT);
+        }
+
+        if (str_contains((string) $objectId, 'new')) {
+            return $this->json(['success' => true]);
+        }
+
+        $model      = $this->getModel($objectType);
+        $aclToCheck = 'email:emails:';
+
+        if ('page' === $objectType) {
+            $aclToCheck = 'page:pages:';
+        }
+
+        /** @var Email|Page|null $entity */
+        $entity = $model->getEntity((int) $objectId);
+
+        if (null === $entity
+            || !$this->security->hasEntityAccess(
+                $aclToCheck.'viewown',
+                $aclToCheck.'viewother',
+                $entity->getCreatedBy()
+            )
+        ) {
+            return $this->accessDenied();
+        }
+
+        $content = $entity->getContent();
+        if (!is_array($content)) {
+            $content = [];
+        }
+
+        if (isset($content['grapesjsbuilder'])) {
+            unset($content['grapesjsbuilder']['projectData']);
+            unset($content['grapesjsbuilder']['version']);
+            unset($content['grapesjsbuilder']['updatedAt']);
+
+            if (empty($content['grapesjsbuilder'])) {
+                unset($content['grapesjsbuilder']);
+            }
+        }
+
+        $entity->setContent($content);
+        $model->getRepository()->saveEntity($entity);
+
+        return $this->json(['success' => true]);
     }
 
     /**

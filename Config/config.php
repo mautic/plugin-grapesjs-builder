@@ -30,6 +30,16 @@ return [
                 'path'       => '/grapesjsbuilder/{objectType}/{objectId}',
                 'controller' => 'MauticPlugin\GrapesJsBuilderBundle\Controller\GrapesJsController::builderAction',
             ],
+            'grapesjsbuilder_project' => [
+                'path'       => '/grapesjsbuilder/{objectType}/{objectId}/project',
+                'controller' => 'MauticPlugin\GrapesJsBuilderBundle\Controller\GrapesJsController::projectAction',
+                'methods'    => ['GET'],
+            ],
+            'grapesjsbuilder_project_reset' => [
+                'path'       => '/grapesjsbuilder/{objectType}/{objectId}/project/reset',
+                'controller' => 'MauticPlugin\GrapesJsBuilderBundle\Controller\GrapesJsController::resetProjectAction',
+                'methods'    => ['POST'],
+            ],
         ],
         'public' => [],
         'api'    => [],
