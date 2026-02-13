@@ -10,7 +10,7 @@ import { themeConfigMixin } from './themeConfig';
  * @param {Object} options - Plugin options
  */
 export default (editor, options) => {
-  new Ck5ForGrapesJs(editor, options);
+  return new Ck5ForGrapesJs(editor, options);
 }
 
 /**
@@ -37,24 +37,22 @@ class Ck5ForGrapesJs {
    */
   constructor(
     editor,
-    {
-      ckeditor_module, inline, inline_options,
-      options, licenseKey, toolbar_max_width,
-      inline_toolbar_max_width, parse_content,
-      theme_alias, reuse_editor
-    } = {
-        ckeditor_module: '',
-        inline: [],
-        inline_options: options,
-        options: undefined,
-        licenseKey: undefined,
-        toolbar_max_width: undefined,
-        inline_toolbar_max_width: undefined,
-        parse_content: false,
-        theme_alias: undefined,
-        reuse_editor: undefined
-      }
+    opts = {}
   ) {
+    const {
+      ckeditor_module = '',
+      inline = [],
+      inline_options,
+      options,
+      licenseKey,
+      toolbar_max_width,
+      inline_toolbar_max_width,
+      parse_content = false,
+      theme_alias,
+      reuse_editor
+    } = opts;
+    const resolvedInlineOptions = inline_options !== undefined ? inline_options : options;
+
     const initialThemeAlias = typeof theme_alias === 'string' && theme_alias.trim() ? theme_alias.trim() : null;
     this._managedLinkColorElements = new WeakSet();
 
@@ -63,7 +61,7 @@ class Ck5ForGrapesJs {
       frame: null,
       licenseKey: licenseKey,
       inline: Array.isArray(inline) ? inline.map(item => item.toLowerCase()) : [],
-      inline_options: inline_options,
+      inline_options: resolvedInlineOptions,
       options: options,
       el: null,
       toolBarMObserver: new MutationObserver(this.onResize.bind(this)),
@@ -79,7 +77,7 @@ class Ck5ForGrapesJs {
       gjsToolBarMObserver: new MutationObserver(this.onResize.bind(this)),
       inlineStyles: null,
       menuMaxWidth: toolbar_max_width,
-      inlineMenuMaxWidth: inline_options === options && inline_toolbar_max_width === undefined ? toolbar_max_width : inline_toolbar_max_width,
+      inlineMenuMaxWidth: resolvedInlineOptions === options && inline_toolbar_max_width === undefined ? toolbar_max_width : inline_toolbar_max_width,
       inlineMode: true,
       editorContainer: null,
       latestContent: null,

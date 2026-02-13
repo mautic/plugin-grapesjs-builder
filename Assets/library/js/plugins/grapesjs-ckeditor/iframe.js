@@ -7,6 +7,18 @@ export function injectDataStorage() {
   };
 }
 
+export function setElementProperty(elem, properties) {
+  if (properties) {
+    for (const key in properties) {
+      if (_typeof(properties[key]) === 'object') {
+        setElementProperty(elem[key], properties[key]);
+      } else {
+        elem[key] = properties[key];
+      }
+    }
+  }
+}
+
 /**
  * Instantiates the editor instantly using options from registry.
  *
@@ -197,22 +209,5 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
       container.appendChild(elem);
     }
     return elem;
-  }
-
-  /**
-   *
-   * @param {Object} elem
-   * @param {Object} properties
-   */
-  function setElementProperty(elem, properties) {
-    if (properties) {
-      for (const key in properties) {
-        if (_typeof(properties[key]) === 'object') {
-          setElementProperty(elem[key], properties[key]);
-        } else {
-          elem[key] = properties[key];
-        }
-      }
-    }
   }
 }

@@ -13,6 +13,7 @@ use Mautic\PageBundle\Entity\Page;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class GrapesJsController extends CommonController
 {
@@ -33,42 +34,39 @@ class GrapesJsController extends CommonController
      */
     private function normalizeContentToArray(mixed $content): array
     {
+        $normalizedContent = [];
+
         if (is_array($content)) {
-            return $content;
+            $normalizedContent = $content;
+        } elseif (is_string($content)) {
+            $decoded = json_decode($content, true);
+            if (JSON_ERROR_NONE === json_last_error() && is_array($decoded)) {
+                $normalizedContent = $decoded;
+            } else {
+                $unserialized = @unserialize($content);
+                if (false !== $unserialized && is_array($unserialized)) {
+                    $normalizedContent = $unserialized;
+                }
+            }
         }
 
-        if (!is_string($content)) {
-            return [];
-        }
-
-        $decoded = json_decode($content, true);
-        if (JSON_ERROR_NONE === json_last_error() && is_array($decoded)) {
-            return $decoded;
-        }
-
-        $unserialized = @unserialize($content);
-        if (false !== $unserialized && is_array($unserialized)) {
-            return $unserialized;
-        }
-
-        return [];
+        return $normalizedContent;
     }
 
     private function extractEditorStateFromContent(array $content): mixed
     {
-        if (!isset($content['grapesjsbuilder']) || !is_array($content['grapesjsbuilder'])) {
-            return null;
+        $editorState   = null;
+        $builderConfig = $content['grapesjsbuilder'] ?? null;
+
+        if (is_array($builderConfig)) {
+            if (array_key_exists('editorState', $builderConfig)) {
+                $editorState = $builderConfig['editorState'];
+            } elseif (array_key_exists('projectData', $builderConfig)) {
+                $editorState = $builderConfig['projectData'];
+            }
         }
 
-        if (array_key_exists('editorState', $content['grapesjsbuilder'])) {
-            return $content['grapesjsbuilder']['editorState'];
-        }
-
-        if (array_key_exists('projectData', $content['grapesjsbuilder'])) {
-            return $content['grapesjsbuilder']['projectData'];
-        }
-
-        return null;
+        return $editorState;
     }
 
     public function builderAction(
@@ -79,7 +77,7 @@ class GrapesJsController extends CommonController
         string $objectId,
     ): Response {
         if (!$this->isAuthorizedObjectType($objectType)) {
-            throw new \Exception('Object not authorized to load custom builder', Response::HTTP_CONFLICT);
+            throw new ConflictHttpException('Object not authorized to load custom builder');
         }
 
         /** @var \Mautic\EmailBundle\Model\EmailModel|\Mautic\PageBundle\Model\PageModel $model */
@@ -167,7 +165,7 @@ class GrapesJsController extends CommonController
         string $objectId,
     ): Response {
         if (!$this->isAuthorizedObjectType($objectType)) {
-            throw new \Exception('Object not authorized to load custom builder', Response::HTTP_CONFLICT);
+            throw new ConflictHttpException('Object not authorized to load custom builder');
         }
 
         if (str_contains((string) $objectId, 'new')) {

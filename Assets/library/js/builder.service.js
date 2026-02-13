@@ -98,13 +98,13 @@ export default class BuilderService {
 
     const objectType = builderRouteContext
       ? builderRouteContext.objectType
-      : (isPage ? 'page' : 'email');
+      : this.getDefaultObjectType(isPage);
     const entityId = builderRouteContext
       ? builderRouteContext.entityId
       : fallbackEntityId;
     const sessionId = builderRouteContext
       ? builderRouteContext.objectId
-      : (sessionValue || null);
+      : this.normalizeSessionId(sessionValue);
 
     return {
       form,
@@ -115,6 +115,14 @@ export default class BuilderService {
       editorStateUrl: builderRouteContext ? builderRouteContext.editorStateUrl : null,
       resetProject: !!(form && form.dataset && form.dataset.grapesjsbuilderReset === 'true'),
     };
+  }
+
+  getDefaultObjectType(isPage) {
+    return isPage ? 'page' : 'email';
+  }
+
+  normalizeSessionId(sessionValue) {
+    return sessionValue || null;
   }
 
   getBuilderRouteContext() {
@@ -1241,27 +1249,61 @@ export default class BuilderService {
 
     this.typographySector = sector;
 
-    const component = this.resolveComponentFromTarget(target) || (this.editor && typeof this.editor.getSelected === 'function' ? this.editor.getSelected() : null);
+    const component = this.getTypographyTargetComponent(target);
     const shouldHide = this.shouldHideTypographySector(component);
 
-    if (typeof sector.set === 'function') {
-      sector.set('visible', !shouldHide);
-    } else {
-      sector.visible = !shouldHide;
+    this.setTypographySectorModelVisibility(sector, shouldHide);
+    this.setTypographySectorDomVisibility(sector, shouldHide);
+  }
+
+  getTypographyTargetComponent(target) {
+    const resolvedTarget = this.resolveComponentFromTarget(target);
+    if (resolvedTarget) {
+      return resolvedTarget;
     }
 
-    // Fallback: forcefully hide/show the sector in the DOM if StyleManager doesn't update the UI correctly.
-    // In GrapesJS 0.22+, the view is not directly on the model, so we find the element by searching for the id/label.
-    const sectorId = typeof sector.getId === 'function' ? sector.getId() : 'typography';
-    const editorContainer = this.editor.getContainer();
-    const sectorEl = editorContainer ? editorContainer.querySelector(`.gjs-sm-sector[id*="${sectorId}"]`) : null;
+    if (this.editor && typeof this.editor.getSelected === 'function') {
+      return this.editor.getSelected();
+    }
+
+    return null;
+  }
+
+  setTypographySectorModelVisibility(sector, shouldHide) {
+    if (typeof sector.set === 'function') {
+      sector.set('visible', !shouldHide);
+      return;
+    }
+
+    sector.visible = !shouldHide;
+  }
+
+  setTypographySectorDomVisibility(sector, shouldHide) {
+    const sectorEl = this.resolveTypographySectorElement(sector);
 
     if (sectorEl) {
       sectorEl.style.display = shouldHide ? 'none' : '';
-    } else if (sector.view && sector.view.el) {
-      // Compatibility with older GrapesJS versions
-      sector.view.el.style.display = shouldHide ? 'none' : '';
     }
+  }
+
+  resolveTypographySectorElement(sector) {
+    const sectorId = typeof sector.getId === 'function' ? sector.getId() : 'typography';
+    const editorContainer = this.editor && typeof this.editor.getContainer === 'function'
+      ? this.editor.getContainer()
+      : null;
+
+    if (editorContainer) {
+      const sectorEl = editorContainer.querySelector(`.gjs-sm-sector[id*="${sectorId}"]`);
+      if (sectorEl) {
+        return sectorEl;
+      }
+    }
+
+    if (sector.view && sector.view.el) {
+      return sector.view.el;
+    }
+
+    return null;
   }
 
   resolveComponentFromTarget(target) {

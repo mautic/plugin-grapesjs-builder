@@ -1,3 +1,7 @@
+function isOpen(element) {
+  return [...element.classList].find(className => className.match(/panel-visible/g));
+}
+
 /**
  * Checks if an open panel overlaps with the GrapesJS toolbar.
  *
@@ -7,18 +11,11 @@
  * @returns {boolean}
  */
 export function isOpenPanelOverlapGjsToolbar(element, gjsToolbar, frame) {
-  let result;
   if (isOpen(element) && overlap(element, gjsToolbar, frame)) {
-    result = true;
-  } else {
-    result = !![...element.children].find(child => isOpenPanelOverlapGjsToolbar(child, gjsToolbar, frame));
+    return true;
   }
 
-  return result;
-
-  function isOpen(element) {
-    return [...element.classList].find(className => className.match(/panel-visible/g));
-  }
+  return !![...element.children].find(child => isOpenPanelOverlapGjsToolbar(child, gjsToolbar, frame));
 }
 
 /**

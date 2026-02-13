@@ -144,20 +144,18 @@ class GrapesJsBuilderModel extends AbstractCommonModel
      */
     private function normalizeContent(mixed $content): array
     {
+        $normalizedContent = [];
+
         if (is_array($content)) {
-            return $content;
+            $normalizedContent = $content;
+        } elseif (is_string($content)) {
+            $decodedContent = json_decode($content, true);
+            if (JSON_ERROR_NONE === json_last_error() && is_array($decodedContent)) {
+                $normalizedContent = $decodedContent;
+            }
         }
 
-        if (!is_string($content)) {
-            return [];
-        }
-
-        $decodedContent = json_decode($content, true);
-        if (JSON_ERROR_NONE === json_last_error() && is_array($decodedContent)) {
-            return $decodedContent;
-        }
-
-        return [];
+        return $normalizedContent;
     }
 
     /**

@@ -2,7 +2,7 @@
  * Editor lifecycle helpers for GrapesJS CKEditor.
  */
 import { createHtmlElem } from './dom';
-import { injectDataStorage, injectEditorInstant } from './iframe';
+import { injectDataStorage, injectEditorInstant, setElementProperty } from './iframe';
 import { isOpenPanelOverlapGjsToolbar } from './overlap';
 
 export const editorLifecycleMixin = {
@@ -451,13 +451,21 @@ export const editorLifecycleMixin = {
     const ckeditor = this.ckeditor;
     let ckeditorContent = ckeditor && ckeditor.data ? ckeditor.data.get() : '';
     if (typeof ckeditorContent !== "string") ckeditorContent = "";
-    const baseContent = this.latestContent === null ? (
-      this.inlineMode ?
-        ckeditorContent.replace(/^<p>/, '').replace(/<\/p>$/, '') :
-        ckeditorContent
-    ) : this.latestContent;
+    const baseContent = this.resolveBaseContent(ckeditorContent);
 
     return this.normalizeListMarkerStyles(this.normalizeIndentationStyles(this.normalizeLinkUnderlineColors(baseContent)));
+  },
+
+  resolveBaseContent(ckeditorContent) {
+    if (this.latestContent !== null) {
+      return this.latestContent;
+    }
+
+    if (!this.inlineMode) {
+      return ckeditorContent;
+    }
+
+    return ckeditorContent.replace(/^<p>/, '').replace(/<\/p>$/, '');
   },
 
   /**
@@ -657,7 +665,7 @@ export const editorLifecycleMixin = {
       'script',
       body,
       {
-        innerHTML: `${injectEditorInstant.toString()}; function _typeof(obj) { return typeof obj; }`
+        innerHTML: `${setElementProperty.toString()}; ${injectEditorInstant.toString()}; function _typeof(obj) { return typeof obj; }`
       }
     );
     this.executeInFrame(
@@ -701,7 +709,11 @@ export const editorLifecycleMixin = {
    * @returns {string}
    */
   getElementId(el) {
-    return el.id = el.id === '' || el.id === null || el.id === undefined ? `ckeditor_target_el_${this.uniqId}` : el.id;
+    if (el.id === '' || el.id === null || el.id === undefined) {
+      el.id = `ckeditor_target_el_${this.uniqId}`;
+    }
+
+    return el.id;
   },
 
   /**

@@ -368,9 +368,6 @@ html {
   min-height: 400px;
   background: var(--background);
   color: var(--text-primary);
-}
-
-.cke-modal .ck-editor .ck-content {
   color: inherit !important;
   font-family: inherit !important;
   font-size: inherit !important;
