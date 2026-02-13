@@ -19,103 +19,11 @@ function launchBuilderGrapesjs(formName) {
 
   // Prepare HTML
   mQuery('html').css('font-size', '100%');
-  function getBuilderContext() {
-    const builderUrlValue = mQuery('#builder_url').val();
-    if (!builderUrlValue) {
-      return null;
-    }
-
-    let url;
-    try {
-      url = new URL(builderUrlValue, window.location.origin);
-    } catch (error) {
-      console.warn('Unable to parse builder URL', error);
-      return null;
-    }
-
-    const match = url.pathname.match(/grapesjsbuilder\/(page|email)\/([^/]+)/);
-    if (!match) {
-      return null;
-    }
-
-    const [, objectType, objectId] = match;
-
-    return {
-      url,
-      objectType,
-      objectId,
-      isNew: objectId.startsWith('new'),
-    };
-  }
-
-  function purgeLocalProjectStorage(entityId) {
-    if (!entityId) {
-      return;
-    }
-
-    const storageKey = 'gjs-storage';
-    let stack;
-
-    try {
-      stack = JSON.parse(localStorage.getItem(storageKey));
-    } catch (error) {
-      console.warn('Unable to parse local GrapesJS storage stack', error);
-      return;
-    }
-
-    if (!Array.isArray(stack)) {
-      return;
-    }
-
-    const filtered = stack.filter((item) => {
-      if (!item || !item.id || typeof item.id !== 'string') {
-        return true;
-      }
-
-      return !item.id.endsWith(`-${entityId}`);
-    });
-
-    if (filtered.length === stack.length) {
-      return;
-    }
-
-    localStorage.setItem(storageKey, JSON.stringify(filtered));
-  }
-
-  async function resetStoredProjectData(context) {
-    if (!context || context.isNew) {
-      return;
-    }
-
-    const resetUrl = `${context.url.origin}${context.url.pathname}/project/reset`;
-
-    try {
-      await fetch(resetUrl, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-          'X-CSRF-Token': typeof mauticAjaxCsrf !== 'undefined' ? mauticAjaxCsrf : '',
-        },
-        body: '{}',
-      });
-    } catch (error) {
-      console.warn('Unable to reset stored GrapesJS project data', error);
-    }
-
-    purgeLocalProjectStorage(context.objectId);
-  }
-
   mQuery('body').css('overflow-y', 'hidden');
   mQuery('.builder-panel').css('padding', 0);
   mQuery('.builder-panel').css('display', 'block');
   const $builder = mQuery('.builder');
   $builder.addClass('builder-active').removeClass('hide');
-
-  const context = getBuilderContext();
-  // Ensure stale local/editor state is cleared when reopening existing entities
-  //void resetStoredProjectData(context);
 
   const assetService = new AssetService();
   const builder = new BuilderService(assetService);

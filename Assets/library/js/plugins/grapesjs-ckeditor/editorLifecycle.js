@@ -762,8 +762,11 @@ export const editorLifecycleMixin = {
 
     const frameData = this.frameContentWindow.grapesjsCkeditorData || (this.frameContentWindow.grapesjsCkeditorData = {});
     const registry = frameData.optionsRegistry || (frameData.optionsRegistry = {});
+    const data = this._Ck5ForGrapesJsData || (this._Ck5ForGrapesJsData = {});
 
-    const key = `options_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    data.optionsRegistryCounter = (data.optionsRegistryCounter || 0) + 1;
+    const key = `options_${Date.now()}_${data.optionsRegistryCounter}`;
+
     registry[key] = options;
 
     return key;

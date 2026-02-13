@@ -18,22 +18,14 @@ class GrapesJsController extends CommonController
 {
     public const OBJECT_TYPE = ['email', 'page'];
 
-    /**
-     * Activate the custom builder.
-     *
-     * @param string $objectType
-     * @param int    $objectId
-     *
-     * @return Response
-     */
     public function builderAction(
         Request $request,
         LoggerInterface $mauticLogger,
         ThemeHelper $themeHelper,
-        $objectType,
-        $objectId,
-    ) {
-        if (!in_array($objectType, self::OBJECT_TYPE)) {
+        string $objectType,
+        string $objectId,
+    ): Response {
+        if (!in_array($objectType, self::OBJECT_TYPE, true)) {
             throw new \Exception('Object not authorized to load custom builder', Response::HTTP_CONFLICT);
         }
 
@@ -58,7 +50,7 @@ class GrapesJsController extends CommonController
             $entity->setSessionId($objectId);
         } else {
             /** @var Email|Page $entity */
-            $entity = $model->getEntity($objectId);
+            $entity = $model->getEntity((int) $objectId);
             $isNew  = false;
 
             if (null == $entity
@@ -121,18 +113,16 @@ class GrapesJsController extends CommonController
         );
     }
 
-    public function projectAction(
-        Request $request,
-        LoggerInterface $mauticLogger,
-        $objectType,
-        $objectId,
-    ) {
-        if (!in_array($objectType, self::OBJECT_TYPE)) {
+    public function editorStateAction(
+        string $objectType,
+        string $objectId,
+    ): Response {
+        if (!in_array($objectType, self::OBJECT_TYPE, true)) {
             throw new \Exception('Object not authorized to load custom builder', Response::HTTP_CONFLICT);
         }
 
         if (str_contains((string) $objectId, 'new')) {
-            return $this->json(['projectData' => null]);
+            return $this->json(['editorState' => null]);
         }
 
         $model      = $this->getModel($objectType);
@@ -156,77 +146,39 @@ class GrapesJsController extends CommonController
         }
 
         $content     = $entity->getContent();
-        $projectData = null;
+        $editorState = null;
 
-        if (is_array($content)
-            && isset($content['grapesjsbuilder'])
-            && array_key_exists('projectData', $content['grapesjsbuilder'])
-        ) {
-            $projectData = $content['grapesjsbuilder']['projectData'];
-        }
-
-        return $this->json(['projectData' => $projectData]);
-    }
-
-    public function resetProjectAction(
-        Request $request,
-        LoggerInterface $mauticLogger,
-        $objectType,
-        $objectId,
-    ) {
-        if (!in_array($objectType, self::OBJECT_TYPE)) {
-            throw new \Exception('Object not authorized to load custom builder', Response::HTTP_CONFLICT);
-        }
-
-        if (str_contains((string) $objectId, 'new')) {
-            return $this->json(['success' => true]);
-        }
-
-        $model      = $this->getModel($objectType);
-        $aclToCheck = 'email:emails:';
-
-        if ('page' === $objectType) {
-            $aclToCheck = 'page:pages:';
-        }
-
-        /** @var Email|Page|null $entity */
-        $entity = $model->getEntity((int) $objectId);
-
-        if (null === $entity
-            || !$this->security->hasEntityAccess(
-                $aclToCheck.'viewown',
-                $aclToCheck.'viewother',
-                $entity->getCreatedBy()
-            )
-        ) {
-            return $this->accessDenied();
-        }
-
-        $content = $entity->getContent();
-        if (!is_array($content)) {
-            $content = [];
-        }
-
-        if (isset($content['grapesjsbuilder'])) {
-            unset($content['grapesjsbuilder']['projectData']);
-            unset($content['grapesjsbuilder']['version']);
-            unset($content['grapesjsbuilder']['updatedAt']);
-
-            if (empty($content['grapesjsbuilder'])) {
-                unset($content['grapesjsbuilder']);
+        // `content` is expected to be an array, but depending on how it was saved
+        // it may be a JSON string or a serialized value. Normalize to array first.
+        if (is_string($content)) {
+            $decoded = json_decode($content, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $content = $decoded;
+            } else {
+                $unserialized = @unserialize($content);
+                if (false !== $unserialized && is_array($unserialized)) {
+                    $content = $unserialized;
+                }
             }
         }
 
-        $entity->setContent($content);
-        $model->getRepository()->saveEntity($entity);
+        if (is_array($content)
+            && isset($content['grapesjsbuilder'])
+        ) {
+            if (array_key_exists('editorState', $content['grapesjsbuilder'])) {
+                $editorState = $content['grapesjsbuilder']['editorState'];
+            } elseif (array_key_exists('projectData', $content['grapesjsbuilder'])) {
+                $editorState = $content['grapesjsbuilder']['projectData'];
+            }
+        }
 
-        return $this->json(['success' => true]);
+        return $this->json(['editorState' => $editorState]);
     }
 
     /**
      * @deprecated deprecated since version 5.0 - use mjml directly in email.html.twig
      */
-    private function checkForMjmlTemplate($template)
+    private function checkForMjmlTemplate(string $template): ?string
     {
         $twig = $this->container->get('twig');
 

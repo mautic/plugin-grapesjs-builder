@@ -90,19 +90,131 @@ export default class BuilderService {
     const isPage = object === 'page';
     const formName = isPage ? 'page' : 'emailform';
     const form = document.querySelector(`form[name="${formName}"]`);
+    const builderRouteContext = this.getBuilderRouteContext();
     const sessionFieldId = isPage ? 'page_sessionId' : 'emailform_sessionId';
     const sessionInput = document.getElementById(sessionFieldId);
     const sessionValue = sessionInput ? sessionInput.value : '';
-    const entityId = sessionValue && !sessionValue.startsWith('new_') ? sessionValue : null;
+    const fallbackEntityId = sessionValue && !sessionValue.startsWith('new_') ? sessionValue : null;
+
+    const objectType = builderRouteContext
+      ? builderRouteContext.objectType
+      : (isPage ? 'page' : 'email');
+    const entityId = builderRouteContext
+      ? builderRouteContext.entityId
+      : fallbackEntityId;
+    const sessionId = builderRouteContext
+      ? builderRouteContext.objectId
+      : (sessionValue || null);
 
     return {
       form,
       formName,
-      sessionId: sessionValue || null,
+      sessionId,
       entityId,
-      objectType: isPage ? 'page' : 'email',
+      objectType,
+      editorStateUrl: builderRouteContext ? builderRouteContext.editorStateUrl : null,
       resetProject: !!(form && form.dataset && form.dataset.grapesjsbuilderReset === 'true'),
     };
+  }
+
+  getBuilderRouteContext() {
+    const builderUrlInput = document.getElementById('builder_url');
+    const builderUrlValue = builderUrlInput && typeof builderUrlInput.value === 'string'
+      ? builderUrlInput.value
+      : '';
+
+    if (!builderUrlValue) {
+      return null;
+    }
+
+    let parsedBuilderUrl;
+
+    try {
+      parsedBuilderUrl = new URL(builderUrlValue, window.location.origin);
+    } catch (error) {
+      console.warn('Unable to parse GrapesJS builder URL', error);
+      return null;
+    }
+
+    const routeMatch = parsedBuilderUrl.pathname.match(/\/grapesjsbuilder\/(page|email)\/([^/]+)\/?$/);
+    if (!routeMatch) {
+      return null;
+    }
+
+    const [, objectType, objectId] = routeMatch;
+    const normalizedObjectId = decodeURIComponent(objectId);
+    const entityId = normalizedObjectId && !normalizedObjectId.startsWith('new')
+      ? normalizedObjectId
+      : null;
+    const normalizedPathname = parsedBuilderUrl.pathname.replace(/\/$/, '');
+
+    return {
+      objectType,
+      objectId: normalizedObjectId,
+      entityId,
+      editorStateUrl: `${parsedBuilderUrl.origin}${normalizedPathname}/editor-state`,
+    };
+  }
+
+  updateBuilderUrlForEntity(objectType, entityId) {
+    const builderUrlInput = document.getElementById('builder_url');
+    if (!builderUrlInput || typeof builderUrlInput.value !== 'string' || !builderUrlInput.value.length) {
+      return;
+    }
+
+    try {
+      const parsedBuilderUrl = new URL(builderUrlInput.value, window.location.origin);
+      const normalizedPathname = parsedBuilderUrl.pathname
+        .replace(/\/s\/(pages|emails)\/builder\/[^/]+\/?$/, `/s/grapesjsbuilder/${objectType}/${entityId}`)
+        .replace(/\/s\/grapesjsbuilder\/(page|email)\/[^/]+\/?$/, `/s/grapesjsbuilder/${objectType}/${entityId}`)
+        .replace(/\/$/, '');
+
+      parsedBuilderUrl.pathname = normalizedPathname;
+      builderUrlInput.value = parsedBuilderUrl.toString();
+    } catch (error) {
+      console.warn('Unable to update GrapesJS builder URL after entity save', error);
+    }
+  }
+
+  syncContextAfterFirstSave(requestUrl, response) {
+    if (!response || typeof response !== 'object' || typeof response.route !== 'string') {
+      return;
+    }
+
+    const requestLastPart = typeof requestUrl === 'string' ? requestUrl.split('/').pop() : null;
+    if (requestLastPart !== 'new') {
+      return;
+    }
+
+    const routeMatch = response.route.match(/\/(pages|emails)\/edit\/(\d+)(?:\/|$)/);
+    if (!routeMatch) {
+      return;
+    }
+
+    const [, rawType, rawEntityId] = routeMatch;
+    const objectType = rawType === 'pages' ? 'page' : 'email';
+    const entityId = String(rawEntityId);
+
+    this.updateBuilderUrlForEntity(objectType, entityId);
+
+    const sessionFieldId = objectType === 'page' ? 'page_sessionId' : 'emailform_sessionId';
+    const sessionField = document.getElementById(sessionFieldId);
+    if (sessionField) {
+      sessionField.value = entityId;
+    }
+
+    if (this.context) {
+      this.context.objectType = objectType;
+      this.context.objectId = entityId;
+      this.context.entityId = entityId;
+      this.context.resetProject = false;
+      if (this.context.form) {
+        this.context.form.dataset.grapesjsbuilderReset = 'false';
+      }
+
+      const refreshedRouteContext = this.getBuilderRouteContext();
+      this.context.editorStateUrl = refreshedRouteContext ? refreshedRouteContext.editorStateUrl : null;
+    }
   }
 
   ensureProjectField(context) {
@@ -110,14 +222,21 @@ export default class BuilderService {
       return null;
     }
 
-    const existing = context.form.querySelector('textarea.builder-json[name="grapesjsbuilder[projectData]"]');
-    if (existing) {
-      return existing;
+    const existingEditorStateField = context.form.querySelector('textarea.builder-json[name="grapesjsbuilder[editorState]"]');
+    if (existingEditorStateField) {
+      return existingEditorStateField;
+    }
+
+    const existingProjectField = context.form.querySelector('textarea.builder-json[name="grapesjsbuilder[projectData]"]');
+    if (existingProjectField) {
+      existingProjectField.name = 'grapesjsbuilder[editorState]';
+      existingProjectField.id = 'grapesjsbuilder_editorState';
+      return existingProjectField;
     }
 
     const field = document.createElement('textarea');
-    field.name = 'grapesjsbuilder[projectData]';
-    field.id = 'grapesjsbuilder_projectData';
+    field.name = 'grapesjsbuilder[editorState]';
+    field.id = 'grapesjsbuilder_editorState';
     field.className = 'builder-json hide';
     field.style.display = 'none';
     context.form.appendChild(field);
@@ -142,7 +261,7 @@ export default class BuilderService {
       const parsed = JSON.parse(value);
       return typeof parsed === 'object' && parsed !== null ? parsed : null;
     } catch (error) {
-      console.warn('Unable to parse GrapesJS project data from field', error);
+      console.warn('Unable to parse GrapesJS project data', error);
       return null;
     }
   }
@@ -163,10 +282,13 @@ export default class BuilderService {
       return null;
     }
 
-    const baseUrl = typeof mauticBaseUrl === 'string' && mauticBaseUrl.length > 0 ? mauticBaseUrl : '/';
-    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    const requestUrl = new URL(`s/grapesjsbuilder/${context.objectType}/${context.entityId}/project`, `${window.location.origin}${normalizedBase}`);
-    const route = requestUrl.toString();
+    let route = context.editorStateUrl;
+    if (!route) {
+      const baseUrl = typeof mauticBaseUrl === 'string' && mauticBaseUrl.length > 0 ? mauticBaseUrl : '/';
+      const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+      const requestUrl = new URL(`s/grapesjsbuilder/${context.objectType}/${context.entityId}/editor-state`, `${window.location.origin}${normalizedBase}`);
+      route = requestUrl.toString();
+    }
 
     try {
       const response = await fetch(route, {
@@ -182,10 +304,12 @@ export default class BuilderService {
       }
 
       const payload = await response.json();
-      const projectData = (payload && typeof payload === 'object') ? payload.projectData : null;
+      const editorState = (payload && typeof payload === 'object')
+        ? (payload.editorState ?? payload.projectData)
+        : null;
 
-      if (typeof projectData === 'string') {
-        const parsed = this.safeParseProjectData(projectData);
+      if (typeof editorState === 'string') {
+        const parsed = this.safeParseProjectData(editorState);
         if (parsed) {
           const serializedFromString = JSON.stringify(parsed);
           this.setProjectFieldValue(serializedFromString);
@@ -196,19 +320,19 @@ export default class BuilderService {
           return parsed;
         }
 
-        this.setProjectFieldValue(projectData);
+        this.setProjectFieldValue(editorState);
 
         return null;
       }
 
-      if (projectData && typeof projectData === 'object') {
-        const serialized = JSON.stringify(projectData);
+      if (editorState && typeof editorState === 'object') {
+        const serialized = JSON.stringify(editorState);
         this.setProjectFieldValue(serialized);
         if (context.form) {
           context.form.dataset.grapesjsbuilderReset = 'false';
         }
         context.resetProject = false;
-        return projectData;
+        return editorState;
       }
 
       this.setProjectFieldValue('');
@@ -379,9 +503,12 @@ export default class BuilderService {
     if (this.context && this.context.form) {
       const $form = mQuery(this.context.form);
       $form
-        .off('submit.grapesjsbuilder form-pre-serialize.grapesjsbuilder')
+        .off('submit.grapesjsbuilder form-pre-serialize.grapesjsbuilder submit:success.grapesjsbuilder')
         .on('submit.grapesjsbuilder', () => this.persistProjectData())
-        .on('form-pre-serialize.grapesjsbuilder', () => this.persistProjectData());
+        .on('form-pre-serialize.grapesjsbuilder', () => this.persistProjectData())
+        .on('submit:success.grapesjsbuilder', (event, requestUrl, response) => {
+          this.syncContextAfterFirstSave(requestUrl, response);
+        });
     }
     this.editor.on('run:mautic-editor-page-html-close', triggerBuilderHide);
     this.editor.on('run:mautic-editor-email-html-close', triggerBuilderHide);
@@ -403,14 +530,12 @@ export default class BuilderService {
   initGrapesJS(object) {
     this.context = this.getContext(object);
     this.projectField = this.ensureProjectField(this.context);
-    this.pendingProjectData = this.safeParseProjectData(this.projectField ? this.projectField.value : '');
+    this.pendingProjectData = null;
     this.projectDataLoaded = false;
 
     const projectPrefetch = this.context.resetProject
       ? null
-      : (this.pendingProjectData
-        ? Promise.resolve(this.pendingProjectData)
-        : this.prefillProjectField(this.context));
+      : this.prefillProjectField(this.context);
 
     // grapesjs-custom-plugins: add globally defined mautic-grapesjs-plugins using name as pluginId for the plugin-function
     if (window.MauticGrapesJsPlugins) {

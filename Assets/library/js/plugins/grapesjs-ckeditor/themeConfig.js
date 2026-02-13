@@ -796,7 +796,20 @@ export const themeConfigMixin = {
       return '';
     }
 
-    return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const slug = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+    let start = 0;
+    let end = slug.length;
+
+    while (start < end && slug[start] === '-') {
+      start += 1;
+    }
+
+    while (end > start && slug[end - 1] === '-') {
+      end -= 1;
+    }
+
+    return slug.slice(start, end);
   },
 
   /**

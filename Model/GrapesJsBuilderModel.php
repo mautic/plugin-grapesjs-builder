@@ -11,6 +11,7 @@ use Mautic\CoreBundle\Model\AbstractCommonModel;
 use Mautic\CoreBundle\Security\Permissions\CorePermissions;
 use Mautic\CoreBundle\Translation\Translator;
 use Mautic\EmailBundle\Entity\Email;
+use Mautic\PageBundle\Entity\Page;
 use Mautic\EmailBundle\Model\EmailModel;
 use MauticPlugin\GrapesJsBuilderBundle\Entity\GrapesJsBuilder;
 use MauticPlugin\GrapesJsBuilderBundle\Entity\GrapesJsBuilderRepository;
@@ -53,37 +54,117 @@ class GrapesJsBuilderModel extends AbstractCommonModel
     }
 
     /**
-     * Add or edit email settings entity based on request.
+     * Add or edit entity settings based on request. Supports `Email` and `Page`.
      */
-    public function addOrEditEntity(Email $email): void
+    public function addOrEditEntity(object $entity): void
     {
-        if ($this->emailModel->isUpdatingTranslationChildren()) {
+        $currentRequest = $this->requestStack->getCurrentRequest();
+        if (!$currentRequest || !$currentRequest->request->has('grapesjsbuilder')) {
             return;
         }
 
-        $grapesJsBuilder = $this->getRepository()->findOneBy(['email' => $email]);
+        $data = $currentRequest->request->all('grapesjsbuilder');
 
-        if (!$grapesJsBuilder) {
-            $grapesJsBuilder = new GrapesJsBuilder();
-            $grapesJsBuilder->setEmail($email);
-        }
+        // Email-specific handling (existing behavior)
+        if ($entity instanceof Email) {
+            if ($this->emailModel->isUpdatingTranslationChildren()) {
+                return;
+            }
 
-        $currentRequest = $this->requestStack->getCurrentRequest();
-        if ($currentRequest && $currentRequest->request->has('grapesjsbuilder')) {
-            $data = $this->requestStack->getCurrentRequest()->get('grapesjsbuilder', '');
+            $grapesJsBuilder = $this->getRepository()->findOneBy(['email' => $entity]);
 
-            if (isset($data['customMjml'])) {
+            if (!$grapesJsBuilder) {
+                $grapesJsBuilder = new GrapesJsBuilder();
+                $grapesJsBuilder->setEmail($entity);
+            }
+
+            if (is_array($data) && isset($data['customMjml'])) {
                 $grapesJsBuilder->setCustomMjml($data['customMjml']);
+            }
+
+            if (is_array($data) && (array_key_exists('editorState', $data) || array_key_exists('projectData', $data))) {
+                $editorState = $data['editorState'] ?? $data['projectData'];
+
+                if (is_string($editorState)) {
+                    $decoded = json_decode($editorState, true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $editorState = $decoded;
+                    }
+                }
+
+                $content = $entity->getContent();
+                if (!is_array($content)) {
+                    if (is_string($content)) {
+                        $decodedContent = json_decode($content, true);
+                        if (json_last_error() === JSON_ERROR_NONE && is_array($decodedContent)) {
+                            $content = $decodedContent;
+                        } else {
+                            $content = [];
+                        }
+                    } else {
+                        $content = [];
+                    }
+                }
+
+                if (!isset($content['grapesjsbuilder']) || !is_array($content['grapesjsbuilder'])) {
+                    $content['grapesjsbuilder'] = [];
+                }
+
+                $content['grapesjsbuilder']['editorState'] = $editorState;
+                $content['grapesjsbuilder']['updatedAt']  = (new \DateTime())->format('c');
+
+                $entity->setContent($content);
             }
 
             $this->getRepository()->saveEntity($grapesJsBuilder);
 
-            $customHtml = $this->requestStack->getCurrentRequest()->get('emailform')['customHtml'] ?? null;
+            $customHtml = $currentRequest->get('emailform')['customHtml'] ?? null;
             if (is_null($customHtml)) {
-                $customHtml = $this->requestStack->getCurrentRequest()->get('customHtml') ?? null;
+                $customHtml = $currentRequest->get('customHtml') ?? null;
             }
-            $email->setCustomHtml($customHtml);
-            $this->emailModel->getRepository()->saveEntity($email);
+            $entity->setCustomHtml($customHtml);
+            $this->emailModel->getRepository()->saveEntity($entity);
+            return;
+        }
+
+        // Page-specific handling: persist editorState into Page::content
+        if ($entity instanceof Page) {
+            if (is_array($data) && (array_key_exists('editorState', $data) || array_key_exists('projectData', $data))) {
+                $editorState = $data['editorState'] ?? $data['projectData'];
+
+                if (is_string($editorState)) {
+                    $decoded = json_decode($editorState, true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $editorState = $decoded;
+                    }
+                }
+
+                $content = $entity->getContent();
+                if (!is_array($content)) {
+                    if (is_string($content)) {
+                        $decodedContent = json_decode($content, true);
+                        if (json_last_error() === JSON_ERROR_NONE && is_array($decodedContent)) {
+                            $content = $decodedContent;
+                        } else {
+                            $content = [];
+                        }
+                    } else {
+                        $content = [];
+                    }
+                }
+
+                if (!isset($content['grapesjsbuilder']) || !is_array($content['grapesjsbuilder'])) {
+                    $content['grapesjsbuilder'] = [];
+                }
+
+                $content['grapesjsbuilder']['editorState'] = $editorState;
+                $content['grapesjsbuilder']['updatedAt']  = (new \DateTime())->format('c');
+
+                $entity->setContent($content);
+
+                $this->em->persist($entity);
+                $this->em->flush();
+            }
         }
     }
 

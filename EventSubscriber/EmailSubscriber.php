@@ -28,9 +28,9 @@ class EmailSubscriber implements EventSubscriberInterface
     public static function getSubscribedEvents(): array
     {
         return [
-            EmailEvents::EMAIL_PRE_SAVE       => ['onEmailPreSave', 0],
-            EmailEvents::EMAIL_POST_SAVE      => ['onEmailPostSave', 0],
-            EmailEvents::EMAIL_POST_DELETE    => ['onEmailDelete', 0],
+            EmailEvents::EMAIL_PRE_SAVE => ['onEmailPreSave', 0],
+            EmailEvents::EMAIL_POST_SAVE => ['onEmailPostSave', 0],
+            EmailEvents::EMAIL_POST_DELETE => ['onEmailDelete', 0],
             EmailEvents::ON_EMAIL_EDIT_SUBMIT => ['manageEmailDraft'],
         ];
     }
@@ -74,7 +74,7 @@ class EmailSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $email           = $event->getEmail();
+        $email = $event->getEmail();
         $grapesJsBuilder = $this->grapesJsBuilderModel->getRepository()->findOneBy(['email' => $email]);
 
         if ($grapesJsBuilder) {
@@ -88,7 +88,7 @@ class EmailSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $email           = $event->getCurrentEmail();
+        $email = $event->getCurrentEmail();
         $grapesJsBuilder = $this->grapesJsBuilderModel->getRepository()->findOneBy(['email' => $email]);
 
         if ($event->isSaveAsDraft()) {
