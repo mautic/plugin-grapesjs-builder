@@ -117,7 +117,7 @@ export const themeConfigMixin = {
 
     const selectedTheme = document.querySelector('.theme-selected [data-theme]');
     if (selectedTheme) {
-      const alias = selectedTheme.getAttribute('data-theme');
+      const alias = selectedTheme.dataset ? selectedTheme.dataset.theme : null;
       if (typeof alias === 'string' && alias.trim()) {
         return alias.trim();
       }

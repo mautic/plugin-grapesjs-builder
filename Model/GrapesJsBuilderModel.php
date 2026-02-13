@@ -11,12 +11,13 @@ use Mautic\CoreBundle\Model\AbstractCommonModel;
 use Mautic\CoreBundle\Security\Permissions\CorePermissions;
 use Mautic\CoreBundle\Translation\Translator;
 use Mautic\EmailBundle\Entity\Email;
-use Mautic\PageBundle\Entity\Page;
 use Mautic\EmailBundle\Model\EmailModel;
+use Mautic\PageBundle\Entity\Page;
 use MauticPlugin\GrapesJsBuilderBundle\Entity\GrapesJsBuilder;
 use MauticPlugin\GrapesJsBuilderBundle\Entity\GrapesJsBuilderRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
@@ -64,108 +65,130 @@ class GrapesJsBuilderModel extends AbstractCommonModel
         }
 
         $data = $currentRequest->request->all('grapesjsbuilder');
-
-        // Email-specific handling (existing behavior)
-        if ($entity instanceof Email) {
-            if ($this->emailModel->isUpdatingTranslationChildren()) {
-                return;
-            }
-
-            $grapesJsBuilder = $this->getRepository()->findOneBy(['email' => $entity]);
-
-            if (!$grapesJsBuilder) {
-                $grapesJsBuilder = new GrapesJsBuilder();
-                $grapesJsBuilder->setEmail($entity);
-            }
-
-            if (is_array($data) && isset($data['customMjml'])) {
-                $grapesJsBuilder->setCustomMjml($data['customMjml']);
-            }
-
-            if (is_array($data) && (array_key_exists('editorState', $data) || array_key_exists('projectData', $data))) {
-                $editorState = $data['editorState'] ?? $data['projectData'];
-
-                if (is_string($editorState)) {
-                    $decoded = json_decode($editorState, true);
-                    if (json_last_error() === JSON_ERROR_NONE) {
-                        $editorState = $decoded;
-                    }
-                }
-
-                $content = $entity->getContent();
-                if (!is_array($content)) {
-                    if (is_string($content)) {
-                        $decodedContent = json_decode($content, true);
-                        if (json_last_error() === JSON_ERROR_NONE && is_array($decodedContent)) {
-                            $content = $decodedContent;
-                        } else {
-                            $content = [];
-                        }
-                    } else {
-                        $content = [];
-                    }
-                }
-
-                if (!isset($content['grapesjsbuilder']) || !is_array($content['grapesjsbuilder'])) {
-                    $content['grapesjsbuilder'] = [];
-                }
-
-                $content['grapesjsbuilder']['editorState'] = $editorState;
-                $content['grapesjsbuilder']['updatedAt']  = (new \DateTime())->format('c');
-
-                $entity->setContent($content);
-            }
-
-            $this->getRepository()->saveEntity($grapesJsBuilder);
-
-            $customHtml = $currentRequest->get('emailform')['customHtml'] ?? null;
-            if (is_null($customHtml)) {
-                $customHtml = $currentRequest->get('customHtml') ?? null;
-            }
-            $entity->setCustomHtml($customHtml);
-            $this->emailModel->getRepository()->saveEntity($entity);
+        if (!is_array($data)) {
             return;
         }
 
-        // Page-specific handling: persist editorState into Page::content
-        if ($entity instanceof Page) {
-            if (is_array($data) && (array_key_exists('editorState', $data) || array_key_exists('projectData', $data))) {
-                $editorState = $data['editorState'] ?? $data['projectData'];
+        if ($entity instanceof Email) {
+            $this->handleEmailEntity($entity, $data, $currentRequest);
 
-                if (is_string($editorState)) {
-                    $decoded = json_decode($editorState, true);
-                    if (json_last_error() === JSON_ERROR_NONE) {
-                        $editorState = $decoded;
-                    }
-                }
-
-                $content = $entity->getContent();
-                if (!is_array($content)) {
-                    if (is_string($content)) {
-                        $decodedContent = json_decode($content, true);
-                        if (json_last_error() === JSON_ERROR_NONE && is_array($decodedContent)) {
-                            $content = $decodedContent;
-                        } else {
-                            $content = [];
-                        }
-                    } else {
-                        $content = [];
-                    }
-                }
-
-                if (!isset($content['grapesjsbuilder']) || !is_array($content['grapesjsbuilder'])) {
-                    $content['grapesjsbuilder'] = [];
-                }
-
-                $content['grapesjsbuilder']['editorState'] = $editorState;
-                $content['grapesjsbuilder']['updatedAt']  = (new \DateTime())->format('c');
-
-                $entity->setContent($content);
-
-                $this->em->persist($entity);
-                $this->em->flush();
-            }
+            return;
         }
+
+        if ($entity instanceof Page) {
+            $this->handlePageEntity($entity, $data);
+        }
+    }
+
+    private function handleEmailEntity(Email $entity, array $data, Request $request): void
+    {
+        if ($this->emailModel->isUpdatingTranslationChildren()) {
+            return;
+        }
+
+        $grapesJsBuilder = $this->getRepository()->findOneBy(['email' => $entity]);
+
+        if (!$grapesJsBuilder) {
+            $grapesJsBuilder = new GrapesJsBuilder();
+            $grapesJsBuilder->setEmail($entity);
+        }
+
+        if (array_key_exists('customMjml', $data)) {
+            $grapesJsBuilder->setCustomMjml($data['customMjml']);
+        }
+
+        $this->updateEntityEditorState($entity, $data);
+        $this->getRepository()->saveEntity($grapesJsBuilder);
+
+        $emailForm  = $request->get('emailform');
+        $customHtml = is_array($emailForm) ? ($emailForm['customHtml'] ?? null) : null;
+        if (null === $customHtml) {
+            $customHtml = $request->get('customHtml') ?? null;
+        }
+
+        $entity->setCustomHtml($customHtml);
+        $this->emailModel->getRepository()->saveEntity($entity);
+    }
+
+    private function handlePageEntity(Page $entity, array $data): void
+    {
+        if (!$this->updateEntityEditorState($entity, $data)) {
+            return;
+        }
+
+        $this->em->persist($entity);
+        $this->em->flush();
+    }
+
+    private function hasEditorStatePayload(array $data): bool
+    {
+        return array_key_exists('editorState', $data) || array_key_exists('projectData', $data);
+    }
+
+    private function decodeEditorState(mixed $editorState): mixed
+    {
+        if (!is_string($editorState)) {
+            return $editorState;
+        }
+
+        $decoded = json_decode($editorState, true);
+        if (JSON_ERROR_NONE === json_last_error()) {
+            return $decoded;
+        }
+
+        return $editorState;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeContent(mixed $content): array
+    {
+        if (is_array($content)) {
+            return $content;
+        }
+
+        if (!is_string($content)) {
+            return [];
+        }
+
+        $decodedContent = json_decode($content, true);
+        if (JSON_ERROR_NONE === json_last_error() && is_array($decodedContent)) {
+            return $decodedContent;
+        }
+
+        return [];
+    }
+
+    /**
+     * @param array<string, mixed> $content
+     *
+     * @return array<string, mixed>
+     */
+    private function mergeEditorStateIntoContent(array $content, mixed $editorState): array
+    {
+        if (!isset($content['grapesjsbuilder']) || !is_array($content['grapesjsbuilder'])) {
+            $content['grapesjsbuilder'] = [];
+        }
+
+        $content['grapesjsbuilder']['editorState'] = $editorState;
+        $content['grapesjsbuilder']['updatedAt']   = (new \DateTime())->format('c');
+
+        return $content;
+    }
+
+    private function updateEntityEditorState(Email|Page $entity, array $data): bool
+    {
+        if (!$this->hasEditorStatePayload($data)) {
+            return false;
+        }
+
+        $rawEditorState = $data['editorState'] ?? $data['projectData'] ?? null;
+        $editorState    = $this->decodeEditorState($rawEditorState);
+        $content        = $this->normalizeContent($entity->getContent());
+        $entity->setContent($this->mergeEditorStateIntoContent($content, $editorState));
+
+        return true;
     }
 
     public function getGrapesJsFromEmailId(?int $emailId)

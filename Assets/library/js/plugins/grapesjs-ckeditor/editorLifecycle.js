@@ -73,149 +73,175 @@ export const editorLifecycleMixin = {
     this.trackToolbarVisibility();
     const computedWidth = this.updateMenuWidthsBySelection(selectedComponent);
 
-    this.el = el;
-    this.display = el.style.display;
-    this.inlineMode = this.isInline(el);
-    this.editorContainer = createHtmlElem(
-      'div',
-      el.parentElement,
-      {}
-    );
-
-    const initializeEditor = () => {
-      if (!this.el || this.el !== el) {
-        return;
-      }
-
-      this.injectFontStyles();
-
-      const optionsKey = this.registerEditorOptions(this.compileEditorOptions(el));
-      const reuseEditor = this._Ck5ForGrapesJsData.reuseEditor ? 'true' : 'false';
-      this.executeInFrame(
-        `${injectEditorInstant.name}('#${this.getElementId(this.editorContainer)}','${optionsKey}',${this.inlineMode ? 'true' : 'false'},${reuseEditor});`
-      );
-
-      const toolbarContainer = this.toolbarContainer;
-      const toolbarMaxWidth = computedWidth || (this.inlineMode ? this.inlineMenuMaxWidth : this.menuMaxWidth);
-      if (toolbarMaxWidth && toolbarContainer) {
-        toolbarContainer.style.maxWidth = toolbarMaxWidth;
-      }
-
-      if (this.inlineMode) {
-        if (['span', 'a'].includes(el.tagName.toLowerCase())) {
-          el.style.display = 'inline-block';
-        }
-        const head = this.frameDoc ? this.frameDoc.querySelector('head') : null;
-        if (head) {
-          this.inlineStyles = createHtmlElem(
-            'style',
-            head,
-            {
-              innerHTML: `.ck-editor__editable>p {display: inline-block; margin-top: 0px !important; margin-bottom: 0px !important;}` +
-                `.ck-editor__editable {display: inline-block;}`
-            }
-          );
-        }
-      }
-
-      if (toolbarContainer && toolbarContainer.firstChild) {
-        this.toolBarMObserver.observe(
-          toolbarContainer.firstChild,
-          {
-            subtree: true,
-            childList: true,
-            attributes: true
-          }
-        );
-      }
-
-      if (this.el) {
-        this.elementObserver.observe(
-          this.el,
-          {
-            subtree: true,
-            childList: true,
-            attributes: true
-          }
-        );
-      }
-
-      setTimeout(
-        () => {
-          if (!this.el || this.el !== el) {
-            return;
-          }
-
-          const ckeditor = this.ckeditor;
-          if (!ckeditor) {
-            return;
-          }
-
-          ckeditor.data.set(this.latestContent);
-          this.latestContent = null;
-          el.innerHTML = '';
-
-          if (ckeditor.ui && ckeditor.ui.view && ckeditor.ui.view.editable && ckeditor.ui.view.editable.element) {
-            el.appendChild(ckeditor.ui.view.editable.element);
-          }
-
-          const toolbarWrapper = this.toolbarContainer && this.toolbarContainer.firstChild;
-          if (toolbarWrapper && ckeditor.ui && ckeditor.ui.view && ckeditor.ui.view.element) {
-            toolbarWrapper.appendChild(ckeditor.ui.view.element);
-          }
-
-          if (toolbarMaxWidth && this.toolbarContainer) {
-            this.toolbarContainer.style.maxWidth = toolbarMaxWidth;
-          }
-
-          this.applyLinkUnderlineNormalization(this.el);
-          this.applyIndentationNormalization(this.el);
-
-          this.editor.refresh();
-          this.onResize();
-
-          try {
-            ckeditor.focus();
-          } catch (error) {
-            console.warn('GrapesJS CKEditor: unable to focus editor', error);
-          }
-
-          const bodyWrapper = this.frameDoc && this.frameDoc.querySelector('.ck-body-wrapper');
-          if (bodyWrapper) {
-            if (!this._Ck5ForGrapesJsData.bodyWrapperMouseDownHandler) {
-              this._Ck5ForGrapesJsData.bodyWrapperMouseDownHandler = e => {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-              };
-            }
-            if (!this._Ck5ForGrapesJsData.bodyWrapperClickHandler) {
-              this._Ck5ForGrapesJsData.bodyWrapperClickHandler = e => {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-              };
-            }
-            bodyWrapper.addEventListener(
-              'mousedown',
-              this._Ck5ForGrapesJsData.bodyWrapperMouseDownHandler
-            );
-            bodyWrapper.addEventListener(
-              'click',
-              this._Ck5ForGrapesJsData.bodyWrapperClickHandler
-            );
-            this._Ck5ForGrapesJsData.bodyWrapperEl = bodyWrapper;
-          }
-
-          this.setCaret();
-        }
-      );
-    };
-
-    const finalizeInitialization = () => initializeEditor();
+    this.prepareEditorActivation(el);
+    const initializeEditor = () => this.initializeEditorInstance(el, computedWidth);
 
     this.ensureFontConfig()
       .catch(() => [])
-      .then(() => finalizeInitialization());
+      .then(initializeEditor);
     return this;
+  },
+
+  prepareEditorActivation(el) {
+    this.el = el;
+    this.display = el.style.display;
+    this.inlineMode = this.isInline(el);
+    this.editorContainer = createHtmlElem('div', el.parentElement, {});
+  },
+
+  initializeEditorInstance(el, computedWidth) {
+    if (!this.el || this.el !== el) {
+      return;
+    }
+
+    this.injectFontStyles();
+
+    const optionsKey = this.registerEditorOptions(this.compileEditorOptions(el));
+    const reuseEditor = this._Ck5ForGrapesJsData.reuseEditor ? 'true' : 'false';
+    this.executeInFrame(
+      `${injectEditorInstant.name}('#${this.getElementId(this.editorContainer)}','${optionsKey}',${this.inlineMode ? 'true' : 'false'},${reuseEditor});`
+    );
+
+    const toolbarContainer = this.toolbarContainer;
+    const toolbarMaxWidth = computedWidth || (this.inlineMode ? this.inlineMenuMaxWidth : this.menuMaxWidth);
+    this.applyToolbarMaxWidth(toolbarContainer, toolbarMaxWidth);
+    this.applyInlineModeStyles(el);
+    this.observeEditorElements(toolbarContainer);
+
+    setTimeout(() => this.mountEditorUi(el, toolbarMaxWidth));
+  },
+
+  applyToolbarMaxWidth(toolbarContainer, toolbarMaxWidth) {
+    if (toolbarContainer && toolbarMaxWidth) {
+      toolbarContainer.style.maxWidth = toolbarMaxWidth;
+    }
+  },
+
+  applyInlineModeStyles(el) {
+    if (!this.inlineMode) {
+      return;
+    }
+
+    if (['span', 'a'].includes(el.tagName.toLowerCase())) {
+      el.style.display = 'inline-block';
+    }
+
+    const head = this.frameDoc ? this.frameDoc.querySelector('head') : null;
+    if (!head) {
+      return;
+    }
+
+    this.inlineStyles = createHtmlElem(
+      'style',
+      head,
+      {
+        innerHTML: `.ck-editor__editable>p {display: inline-block; margin-top: 0px !important; margin-bottom: 0px !important;}` +
+          `.ck-editor__editable {display: inline-block;}`
+      }
+    );
+  },
+
+  observeEditorElements(toolbarContainer) {
+    if (toolbarContainer && toolbarContainer.firstChild) {
+      this.toolBarMObserver.observe(toolbarContainer.firstChild, {
+        subtree: true,
+        childList: true,
+        attributes: true
+      });
+    }
+
+    if (this.el) {
+      this.elementObserver.observe(this.el, {
+        subtree: true,
+        childList: true,
+        attributes: true
+      });
+    }
+  },
+
+  getEditorEditableElement(ckeditor) {
+    if (ckeditor && ckeditor.ui && ckeditor.ui.view && ckeditor.ui.view.editable) {
+      return ckeditor.ui.view.editable.element;
+    }
+
+    return null;
+  },
+
+  getEditorToolbarElement(ckeditor) {
+    if (ckeditor && ckeditor.ui && ckeditor.ui.view) {
+      return ckeditor.ui.view.element;
+    }
+
+    return null;
+  },
+
+  ensureBodyWrapperHandlers() {
+    if (!this._Ck5ForGrapesJsData.bodyWrapperMouseDownHandler) {
+      this._Ck5ForGrapesJsData.bodyWrapperMouseDownHandler = e => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      };
+    }
+
+    if (!this._Ck5ForGrapesJsData.bodyWrapperClickHandler) {
+      this._Ck5ForGrapesJsData.bodyWrapperClickHandler = e => {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      };
+    }
+  },
+
+  bindBodyWrapperListeners(bodyWrapper) {
+    this.ensureBodyWrapperHandlers();
+
+    bodyWrapper.addEventListener('mousedown', this._Ck5ForGrapesJsData.bodyWrapperMouseDownHandler);
+    bodyWrapper.addEventListener('click', this._Ck5ForGrapesJsData.bodyWrapperClickHandler);
+    this._Ck5ForGrapesJsData.bodyWrapperEl = bodyWrapper;
+  },
+
+  mountEditorUi(el, toolbarMaxWidth) {
+    if (!this.el || this.el !== el) {
+      return;
+    }
+
+    const ckeditor = this.ckeditor;
+    if (!ckeditor) {
+      return;
+    }
+
+    ckeditor.data.set(this.latestContent);
+    this.latestContent = null;
+    el.innerHTML = '';
+
+    const editableEl = this.getEditorEditableElement(ckeditor);
+    if (editableEl) {
+      el.appendChild(editableEl);
+    }
+
+    const toolbarWrapper = this.toolbarContainer && this.toolbarContainer.firstChild;
+    const toolbarEl = this.getEditorToolbarElement(ckeditor);
+    if (toolbarWrapper && toolbarEl) {
+      toolbarWrapper.appendChild(toolbarEl);
+    }
+
+    this.applyToolbarMaxWidth(this.toolbarContainer, toolbarMaxWidth);
+    this.applyLinkUnderlineNormalization(this.el);
+    this.applyIndentationNormalization(this.el);
+    this.editor.refresh();
+    this.onResize();
+
+    try {
+      ckeditor.focus();
+    } catch (error) {
+      console.warn('GrapesJS CKEditor: unable to focus editor', error);
+    }
+
+    const bodyWrapper = this.frameDoc && this.frameDoc.querySelector('.ck-body-wrapper');
+    if (bodyWrapper) {
+      this.bindBodyWrapperListeners(bodyWrapper);
+    }
+
+    this.setCaret();
   },
 
   /**
@@ -467,93 +493,120 @@ export const editorLifecycleMixin = {
     this.restoreBadgableComponent();
     this.restoreToolbarVisibility();
 
-    if (this.el) {
-      let content = this.getContent();
-      this.toolBarMObserver.disconnect();
-      this.elementObserver.disconnect();
-      this.gjsToolBarMObserver.disconnect();
-      const toolbarContainer = this.toolbarContainer;
-      const ckeditor = this.ckeditor;
-      const frameWindow = this.frameContentWindow;
-      if (frameWindow && this._Ck5ForGrapesJsData.frameScrollHandler) {
-        frameWindow.removeEventListener('scroll', this._Ck5ForGrapesJsData.frameScrollHandler);
-      }
-      if (frameWindow && this._Ck5ForGrapesJsData.frameResizeHandler) {
-        frameWindow.removeEventListener('resize', this._Ck5ForGrapesJsData.frameResizeHandler);
-      }
-      if (this._Ck5ForGrapesJsData.frameBodyEl && this._Ck5ForGrapesJsData.frameBodyMouseDownHandler) {
-        this._Ck5ForGrapesJsData.frameBodyEl.removeEventListener(
-          'mousedown',
-          this._Ck5ForGrapesJsData.frameBodyMouseDownHandler
-        );
-      }
-      if (this._Ck5ForGrapesJsData.bodyWrapperEl) {
-        if (this._Ck5ForGrapesJsData.bodyWrapperMouseDownHandler) {
-          this._Ck5ForGrapesJsData.bodyWrapperEl.removeEventListener(
-            'mousedown',
-            this._Ck5ForGrapesJsData.bodyWrapperMouseDownHandler
-          );
-        }
-        if (this._Ck5ForGrapesJsData.bodyWrapperClickHandler) {
-          this._Ck5ForGrapesJsData.bodyWrapperEl.removeEventListener(
-            'click',
-            this._Ck5ForGrapesJsData.bodyWrapperClickHandler
-          );
-        }
-      }
-      const reuseEditor = !!this._Ck5ForGrapesJsData.reuseEditor;
-      if (!reuseEditor && this.inFrameData && this.inFrameData.tipObserver) {
-        try {
-          this.inFrameData.tipObserver.disconnect();
-        } catch (error) {
-          console.warn('GrapesJS CKEditor: unable to disconnect tip observer', error);
-        }
-        this.inFrameData.tipObserver = null;
-      }
-
-      const finalizeCleanup = () => {
-        if (this.inFrameData) {
-          if (!reuseEditor) {
-            this.inFrameData.editor = null;
-          }
-          this.inFrameData.toolbarContainer = null;
-        }
-        toolbarContainer && toolbarContainer.remove();
-        this.inlineStyles && this.inlineStyles.remove();
-        this.inlineStyles = null;
-        this._Ck5ForGrapesJsData.frameBodyEl = null;
-        this._Ck5ForGrapesJsData.bodyWrapperEl = null;
-        this.el.innerHTML = content;
-        this.el.style.display = this.display;
-        this.el.contentEditable = false;
-        this.el = null;
-        this.editorContainer && this.editorContainer.remove();
-        this.editorContainer = null;
-        this.latestContent = null;
-        this.display = undefined;
-        this.latestClickEvent = null;
-      };
-
-      if (reuseEditor) {
-        finalizeCleanup();
-      } else if (ckeditor && typeof ckeditor.destroy === 'function') {
-        Promise.resolve(ckeditor.destroy())
-          .catch(error => {
-            console.warn('GrapesJS CKEditor: unable to destroy editor', error);
-          })
-          .then(() => {
-            if (ckeditor._context && typeof ckeditor._context.destroy === 'function') {
-              ckeditor._context.destroy();
-            }
-          })
-          .then(() => finalizeCleanup());
-      } else {
-        if (ckeditor && ckeditor._context && typeof ckeditor._context.destroy === 'function') {
-          ckeditor._context.destroy();
-        }
-        finalizeCleanup();
-      }
+    if (!this.el) {
+      return;
     }
+
+    const content = this.getContent();
+    const toolbarContainer = this.toolbarContainer;
+    const ckeditor = this.ckeditor;
+    const reuseEditor = !!this._Ck5ForGrapesJsData.reuseEditor;
+
+    this.toolBarMObserver.disconnect();
+    this.elementObserver.disconnect();
+    this.gjsToolBarMObserver.disconnect();
+    this.detachFrameListeners();
+    this.detachFrameBodyListeners();
+    this.detachBodyWrapperListeners();
+    this.disconnectTipObserver(reuseEditor);
+
+    const finalizeCleanup = () => this.finalizeDisableCleanup(content, reuseEditor, toolbarContainer);
+    this.destroyEditorAndCleanup(ckeditor, reuseEditor, finalizeCleanup);
+  },
+
+  detachFrameListeners() {
+    const frameWindow = this.frameContentWindow;
+    if (frameWindow && this._Ck5ForGrapesJsData.frameScrollHandler) {
+      frameWindow.removeEventListener('scroll', this._Ck5ForGrapesJsData.frameScrollHandler);
+    }
+    if (frameWindow && this._Ck5ForGrapesJsData.frameResizeHandler) {
+      frameWindow.removeEventListener('resize', this._Ck5ForGrapesJsData.frameResizeHandler);
+    }
+  },
+
+  detachFrameBodyListeners() {
+    if (this._Ck5ForGrapesJsData.frameBodyEl && this._Ck5ForGrapesJsData.frameBodyMouseDownHandler) {
+      this._Ck5ForGrapesJsData.frameBodyEl.removeEventListener('mousedown', this._Ck5ForGrapesJsData.frameBodyMouseDownHandler);
+    }
+  },
+
+  detachBodyWrapperListeners() {
+    const bodyWrapperEl = this._Ck5ForGrapesJsData.bodyWrapperEl;
+    if (!bodyWrapperEl) {
+      return;
+    }
+
+    if (this._Ck5ForGrapesJsData.bodyWrapperMouseDownHandler) {
+      bodyWrapperEl.removeEventListener('mousedown', this._Ck5ForGrapesJsData.bodyWrapperMouseDownHandler);
+    }
+    if (this._Ck5ForGrapesJsData.bodyWrapperClickHandler) {
+      bodyWrapperEl.removeEventListener('click', this._Ck5ForGrapesJsData.bodyWrapperClickHandler);
+    }
+  },
+
+  disconnectTipObserver(reuseEditor) {
+    if (reuseEditor || !this.inFrameData || !this.inFrameData.tipObserver) {
+      return;
+    }
+
+    try {
+      this.inFrameData.tipObserver.disconnect();
+    } catch (error) {
+      console.warn('GrapesJS CKEditor: unable to disconnect tip observer', error);
+    }
+
+    this.inFrameData.tipObserver = null;
+  },
+
+  finalizeDisableCleanup(content, reuseEditor, toolbarContainer) {
+    if (this.inFrameData) {
+      if (!reuseEditor) {
+        this.inFrameData.editor = null;
+      }
+      this.inFrameData.toolbarContainer = null;
+    }
+
+    toolbarContainer && toolbarContainer.remove();
+    this.inlineStyles && this.inlineStyles.remove();
+    this.inlineStyles = null;
+    this._Ck5ForGrapesJsData.frameBodyEl = null;
+    this._Ck5ForGrapesJsData.bodyWrapperEl = null;
+    this.el.innerHTML = content;
+    this.el.style.display = this.display;
+    this.el.contentEditable = false;
+    this.el = null;
+    this.editorContainer && this.editorContainer.remove();
+    this.editorContainer = null;
+    this.latestContent = null;
+    this.display = undefined;
+    this.latestClickEvent = null;
+  },
+
+  destroyEditorAndCleanup(ckeditor, reuseEditor, finalizeCleanup) {
+    if (reuseEditor) {
+      finalizeCleanup();
+      return;
+    }
+
+    const destroyEditorContext = () => {
+      if (ckeditor && ckeditor._context && typeof ckeditor._context.destroy === 'function') {
+        ckeditor._context.destroy();
+      }
+    };
+
+    if (ckeditor && typeof ckeditor.destroy === 'function') {
+      Promise.resolve(ckeditor.destroy())
+        .catch(error => {
+          console.warn('GrapesJS CKEditor: unable to destroy editor', error);
+        })
+        .then(destroyEditorContext)
+        .then(finalizeCleanup);
+
+      return;
+    }
+
+    destroyEditorContext();
+    finalizeCleanup();
   },
 
   /**
@@ -693,60 +746,94 @@ export const editorLifecycleMixin = {
    * Positions the toolbar relative to the edited element.
    */
   positionToolbar() {
-    if (this.toolbarContainer && this.toolbarContainer.firstChild.firstChild) {
-      this.toolbarContainer.style.display = '';
-      this.toolbarContainer.style.top = '0px';
-      this.toolbarContainer.style.left = '0px';
-      const gjsToolbar = this.gjsToolbar;
-      gjsToolbar && this.gjsToolBarMObserver.observe(
-        gjsToolbar,
-        {
-          subtree: false,
-          childList: false,
-          attributes: true
-        }
-      )
-      setTimeout(this.tuneGjsToolbar.bind(this));
-      const gjsToolbarBoundingRect = (gjsToolbar && gjsToolbar.getBoundingClientRect()) ||
-        { width: 0, height: 0, bottom: 0 };
-      let toolBarBoundingRect = this.toolbarContainer.getBoundingClientRect();
-      const elBoundingRect = this.el.getBoundingClientRect();
-      const gjsToolbarHSpace = 1;
-      const gjsToolbarToScreenBorderSpace = 5;
-      const gjsToolbarVSpace = 1;
-      let left, top;
-
-      // Should we center toolbar
-      const center = toolBarBoundingRect.width > elBoundingRect.width - gjsToolbarBoundingRect.width - gjsToolbarHSpace;
-      if (center) {
-        left = elBoundingRect.left - (toolBarBoundingRect.width - elBoundingRect.width) / 2 + this.frameScrollX;
-        if (left + toolBarBoundingRect.width > this.frameBody.offsetWidth) {
-          left -= left + toolBarBoundingRect.width - this.frameBody.offsetWidth + gjsToolbarToScreenBorderSpace;
-        }
-        if (left < this.frameScrollX) left = this.frameScrollX;
-      } else {
-        left = elBoundingRect.left + this.frameScrollX;
-      }
-      this.toolbarContainer.style.left = left + 'px';
-
-      toolBarBoundingRect = this.toolbarContainer.getBoundingClientRect();
-      top = (
-        elBoundingRect.top + this.frameScrollY - toolBarBoundingRect.height - gjsToolbarVSpace -
-        (center ? gjsToolbarBoundingRect.height : 0)
-      );
-      if (top <= this.frameScrollY) {
-        top = (
-          elBoundingRect.bottom + this.frameScrollY + gjsToolbarVSpace +
-          (
-            center && gjsToolbarBoundingRect.bottom > elBoundingRect.bottom ? gjsToolbarBoundingRect.height : 0
-          )
-        );
-      }
-      this.toolbarContainer.style.top = top + 'px';
-    } else {
+    if (!this.hasToolbarContainerContent()) {
       this.toolbarContainer.style.display = 'none';
       setTimeout(this.tuneGjsToolbar.bind(this));
+      return;
     }
+
+    this.toolbarContainer.style.display = '';
+    this.toolbarContainer.style.top = '0px';
+    this.toolbarContainer.style.left = '0px';
+
+    const gjsToolbar = this.gjsToolbar;
+    this.observeGjsToolbar(gjsToolbar);
+    setTimeout(this.tuneGjsToolbar.bind(this));
+
+    const gjsToolbarBoundingRect = this.getGjsToolbarRect(gjsToolbar);
+    let toolBarBoundingRect = this.toolbarContainer.getBoundingClientRect();
+    const elBoundingRect = this.el.getBoundingClientRect();
+    const center = this.shouldCenterToolbar(toolBarBoundingRect, elBoundingRect, gjsToolbarBoundingRect.width);
+    const left = this.calculateToolbarLeft(toolBarBoundingRect, elBoundingRect, center);
+
+    this.toolbarContainer.style.left = `${left}px`;
+
+    toolBarBoundingRect = this.toolbarContainer.getBoundingClientRect();
+    const top = this.calculateToolbarTop(toolBarBoundingRect, elBoundingRect, gjsToolbarBoundingRect, center);
+    this.toolbarContainer.style.top = `${top}px`;
+  },
+
+  hasToolbarContainerContent() {
+    return !!(this.toolbarContainer && this.toolbarContainer.firstChild && this.toolbarContainer.firstChild.firstChild);
+  },
+
+  observeGjsToolbar(gjsToolbar) {
+    if (!gjsToolbar) {
+      return;
+    }
+
+    this.gjsToolBarMObserver.observe(gjsToolbar, {
+      subtree: false,
+      childList: false,
+      attributes: true
+    });
+  },
+
+  getGjsToolbarRect(gjsToolbar) {
+    return (gjsToolbar && gjsToolbar.getBoundingClientRect()) || { width: 0, height: 0, bottom: 0 };
+  },
+
+  shouldCenterToolbar(toolBarBoundingRect, elBoundingRect, gjsToolbarWidth) {
+    const gjsToolbarHSpace = 1;
+    return toolBarBoundingRect.width > elBoundingRect.width - gjsToolbarWidth - gjsToolbarHSpace;
+  },
+
+  calculateToolbarLeft(toolBarBoundingRect, elBoundingRect, center) {
+    if (!center) {
+      return elBoundingRect.left + this.frameScrollX;
+    }
+
+    const gjsToolbarToScreenBorderSpace = 5;
+    let left = elBoundingRect.left - (toolBarBoundingRect.width - elBoundingRect.width) / 2 + this.frameScrollX;
+
+    if (left + toolBarBoundingRect.width > this.frameBody.offsetWidth) {
+      left -= left + toolBarBoundingRect.width - this.frameBody.offsetWidth + gjsToolbarToScreenBorderSpace;
+    }
+
+    if (left < this.frameScrollX) {
+      return this.frameScrollX;
+    }
+
+    return left;
+  },
+
+  calculateToolbarTop(toolBarBoundingRect, elBoundingRect, gjsToolbarBoundingRect, center) {
+    const gjsToolbarVSpace = 1;
+    let top = (
+      elBoundingRect.top + this.frameScrollY - toolBarBoundingRect.height - gjsToolbarVSpace -
+      (center ? gjsToolbarBoundingRect.height : 0)
+    );
+
+    if (top > this.frameScrollY) {
+      return top;
+    }
+
+    top = (
+      elBoundingRect.bottom + this.frameScrollY + gjsToolbarVSpace +
+      (center && gjsToolbarBoundingRect.bottom > elBoundingRect.bottom ? gjsToolbarBoundingRect.height : 0)
+    );
+
+    return top;
   },
 
   /**

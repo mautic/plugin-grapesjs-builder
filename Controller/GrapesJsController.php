@@ -18,6 +18,59 @@ class GrapesJsController extends CommonController
 {
     public const OBJECT_TYPE = ['email', 'page'];
 
+    private function isAuthorizedObjectType(string $objectType): bool
+    {
+        return in_array($objectType, self::OBJECT_TYPE, true);
+    }
+
+    private function getAclPrefix(string $objectType): string
+    {
+        return 'page' === $objectType ? 'page:pages:' : 'email:emails:';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeContentToArray(mixed $content): array
+    {
+        if (is_array($content)) {
+            return $content;
+        }
+
+        if (!is_string($content)) {
+            return [];
+        }
+
+        $decoded = json_decode($content, true);
+        if (JSON_ERROR_NONE === json_last_error() && is_array($decoded)) {
+            return $decoded;
+        }
+
+        $unserialized = @unserialize($content);
+        if (false !== $unserialized && is_array($unserialized)) {
+            return $unserialized;
+        }
+
+        return [];
+    }
+
+    private function extractEditorStateFromContent(array $content): mixed
+    {
+        if (!isset($content['grapesjsbuilder']) || !is_array($content['grapesjsbuilder'])) {
+            return null;
+        }
+
+        if (array_key_exists('editorState', $content['grapesjsbuilder'])) {
+            return $content['grapesjsbuilder']['editorState'];
+        }
+
+        if (array_key_exists('projectData', $content['grapesjsbuilder'])) {
+            return $content['grapesjsbuilder']['projectData'];
+        }
+
+        return null;
+    }
+
     public function builderAction(
         Request $request,
         LoggerInterface $mauticLogger,
@@ -25,17 +78,13 @@ class GrapesJsController extends CommonController
         string $objectType,
         string $objectId,
     ): Response {
-        if (!in_array($objectType, self::OBJECT_TYPE, true)) {
+        if (!$this->isAuthorizedObjectType($objectType)) {
             throw new \Exception('Object not authorized to load custom builder', Response::HTTP_CONFLICT);
         }
 
         /** @var \Mautic\EmailBundle\Model\EmailModel|\Mautic\PageBundle\Model\PageModel $model */
         $model      = $this->getModel($objectType);
-        $aclToCheck = 'email:emails:';
-
-        if ('page' === $objectType) {
-            $aclToCheck = 'page:pages:';
-        }
+        $aclToCheck = $this->getAclPrefix($objectType);
 
         // permission check
         if (str_contains((string) $objectId, 'new')) {
@@ -117,7 +166,7 @@ class GrapesJsController extends CommonController
         string $objectType,
         string $objectId,
     ): Response {
-        if (!in_array($objectType, self::OBJECT_TYPE, true)) {
+        if (!$this->isAuthorizedObjectType($objectType)) {
             throw new \Exception('Object not authorized to load custom builder', Response::HTTP_CONFLICT);
         }
 
@@ -126,11 +175,7 @@ class GrapesJsController extends CommonController
         }
 
         $model      = $this->getModel($objectType);
-        $aclToCheck = 'email:emails:';
-
-        if ('page' === $objectType) {
-            $aclToCheck = 'page:pages:';
-        }
+        $aclToCheck = $this->getAclPrefix($objectType);
 
         /** @var Email|Page|null $entity */
         $entity = $model->getEntity((int) $objectId);
@@ -145,32 +190,8 @@ class GrapesJsController extends CommonController
             return $this->accessDenied();
         }
 
-        $content     = $entity->getContent();
-        $editorState = null;
-
-        // `content` is expected to be an array, but depending on how it was saved
-        // it may be a JSON string or a serialized value. Normalize to array first.
-        if (is_string($content)) {
-            $decoded = json_decode($content, true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                $content = $decoded;
-            } else {
-                $unserialized = @unserialize($content);
-                if (false !== $unserialized && is_array($unserialized)) {
-                    $content = $unserialized;
-                }
-            }
-        }
-
-        if (is_array($content)
-            && isset($content['grapesjsbuilder'])
-        ) {
-            if (array_key_exists('editorState', $content['grapesjsbuilder'])) {
-                $editorState = $content['grapesjsbuilder']['editorState'];
-            } elseif (array_key_exists('projectData', $content['grapesjsbuilder'])) {
-                $editorState = $content['grapesjsbuilder']['projectData'];
-            }
-        }
+        $content     = $this->normalizeContentToArray($entity->getContent());
+        $editorState = $this->extractEditorStateFromContent($content);
 
         return $this->json(['editorState' => $editorState]);
     }

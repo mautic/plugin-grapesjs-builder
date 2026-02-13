@@ -266,28 +266,83 @@ export default class BuilderService {
     }
   }
 
-  async prefillProjectField(context) {
+  resolveEditorStateRoute(context) {
     if (!context) {
+      return null;
+    }
+
+    if (context.editorStateUrl) {
+      return context.editorStateUrl;
+    }
+
+    if (!context.objectType || !context.entityId) {
+      return null;
+    }
+
+    const baseUrl = typeof mauticBaseUrl === 'string' && mauticBaseUrl.length > 0 ? mauticBaseUrl : '/';
+    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    const requestUrl = new URL(`s/grapesjsbuilder/${context.objectType}/${context.entityId}/editor-state`, `${window.location.origin}${normalizedBase}`);
+
+    return requestUrl.toString();
+  }
+
+  setContextProjectReset(context, resetProject) {
+    if (!context) {
+      return;
+    }
+
+    if (context.form) {
+      context.form.dataset.grapesjsbuilderReset = resetProject ? 'true' : 'false';
+    }
+
+    context.resetProject = resetProject;
+  }
+
+  extractEditorStateFromPayload(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+
+    return payload.editorState ?? payload.projectData ?? null;
+  }
+
+  applyPrefilledEditorState(editorState, context) {
+    if (typeof editorState === 'string') {
+      const parsed = this.safeParseProjectData(editorState);
+      if (parsed) {
+        this.setProjectFieldValue(JSON.stringify(parsed));
+        this.setContextProjectReset(context, false);
+
+        return parsed;
+      }
+
+      this.setProjectFieldValue(editorState);
+
+      return null;
+    }
+
+    if (editorState && typeof editorState === 'object') {
+      this.setProjectFieldValue(JSON.stringify(editorState));
+      this.setContextProjectReset(context, false);
+
+      return editorState;
+    }
+
+    this.setProjectFieldValue('');
+
+    return null;
+  }
+
+  async prefillProjectField(context) {
+    if (!context || context.resetProject || !context.entityId) {
       this.setProjectFieldValue('');
       return null;
     }
 
-    if (context.resetProject) {
-      this.setProjectFieldValue('');
-      return null;
-    }
-
-    if (!context.entityId) {
-      this.setProjectFieldValue('');
-      return null;
-    }
-
-    let route = context.editorStateUrl;
+    const route = this.resolveEditorStateRoute(context);
     if (!route) {
-      const baseUrl = typeof mauticBaseUrl === 'string' && mauticBaseUrl.length > 0 ? mauticBaseUrl : '/';
-      const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-      const requestUrl = new URL(`s/grapesjsbuilder/${context.objectType}/${context.entityId}/editor-state`, `${window.location.origin}${normalizedBase}`);
-      route = requestUrl.toString();
+      this.setProjectFieldValue('');
+      return null;
     }
 
     try {
@@ -304,40 +359,9 @@ export default class BuilderService {
       }
 
       const payload = await response.json();
-      const editorState = (payload && typeof payload === 'object')
-        ? (payload.editorState ?? payload.projectData)
-        : null;
+      const editorState = this.extractEditorStateFromPayload(payload);
 
-      if (typeof editorState === 'string') {
-        const parsed = this.safeParseProjectData(editorState);
-        if (parsed) {
-          const serializedFromString = JSON.stringify(parsed);
-          this.setProjectFieldValue(serializedFromString);
-          if (context.form) {
-            context.form.dataset.grapesjsbuilderReset = 'false';
-          }
-          context.resetProject = false;
-          return parsed;
-        }
-
-        this.setProjectFieldValue(editorState);
-
-        return null;
-      }
-
-      if (editorState && typeof editorState === 'object') {
-        const serialized = JSON.stringify(editorState);
-        this.setProjectFieldValue(serialized);
-        if (context.form) {
-          context.form.dataset.grapesjsbuilderReset = 'false';
-        }
-        context.resetProject = false;
-        return editorState;
-      }
-
-      this.setProjectFieldValue('');
-
-      return null;
+      return this.applyPrefilledEditorState(editorState, context);
     } catch (error) {
       console.warn('Unable to fetch GrapesJS project data', error);
       this.setProjectFieldValue('');
@@ -749,7 +773,7 @@ export default class BuilderService {
 
     const selectedTheme = document.querySelector('.theme-selected [data-theme]');
     if (selectedTheme) {
-      const fromSelection = selectedTheme.getAttribute('data-theme');
+      const fromSelection = selectedTheme.dataset ? selectedTheme.dataset.theme : null;
       if (typeof fromSelection === 'string' && fromSelection.trim()) {
         return fromSelection.trim();
       }
@@ -1168,32 +1192,40 @@ export default class BuilderService {
       return;
     }
 
-    // Clear any queued update so only the latest selection state drives visibility.
-    if (this.typographySectorTimeout) {
-      if (typeof window !== 'undefined' && typeof window.clearTimeout === 'function') {
-        window.clearTimeout(this.typographySectorTimeout);
-      } else {
-        clearTimeout(this.typographySectorTimeout);
-      }
-    }
-
-    const clearHandle = () => {
-      this.typographySectorTimeout = null;
-    };
+    this.clearTypographySectorUpdateTimeout();
 
     const run = () => {
-      clearHandle();
+      this.typographySectorTimeout = null;
       this.updateTypographySectorVisibility(target);
     };
 
-    // Schedule with the requested delay (0 falls back to next tick).
+    this.typographySectorTimeout = this.scheduleTypographyTimeout(run, delay);
+  }
+
+  clearTypographySectorUpdateTimeout() {
+    if (!this.typographySectorTimeout) {
+      return;
+    }
+
+    const timeoutId = this.typographySectorTimeout;
+    this.typographySectorTimeout = null;
+
+    if (typeof window !== 'undefined' && typeof window.clearTimeout === 'function') {
+      window.clearTimeout(timeoutId);
+      return;
+    }
+
+    clearTimeout(timeoutId);
+  }
+
+  scheduleTypographyTimeout(callback, delay = 0) {
     const timeoutDelay = typeof delay === 'number' && delay > 0 ? delay : 0;
 
     if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') {
-      this.typographySectorTimeout = window.setTimeout(run, timeoutDelay);
-    } else {
-      this.typographySectorTimeout = setTimeout(run, timeoutDelay);
+      return window.setTimeout(callback, timeoutDelay);
     }
+
+    return setTimeout(callback, timeoutDelay);
   }
 
   updateTypographySectorVisibility(target = null) {

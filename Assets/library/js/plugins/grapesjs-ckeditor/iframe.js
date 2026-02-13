@@ -15,6 +15,30 @@ export function injectDataStorage() {
  * @param {boolean} forceBr
  */
 export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) {
+  const normalizeFeedItems = (items) => Array.from(items || []);
+  const toMentionFeedPromise = (feed, queryText) => Promise.resolve(feed(queryText))
+    .then(normalizeFeedItems)
+    .catch(err => {
+      console.error('Mention feed error:', err);
+      return [];
+    });
+
+  const wrapMentionFeed = (feed) => (queryText) => new Promise(resolve => {
+    toMentionFeedPromise(feed, queryText).then(resolve);
+  });
+
+  const normalizeMentionFeeds = (mentionConfig) => {
+    if (!mentionConfig || !Array.isArray(mentionConfig.feeds)) {
+      return;
+    }
+
+    mentionConfig.feeds.forEach(feedConfig => {
+      if (typeof feedConfig.feed === 'function') {
+        feedConfig.feed = wrapMentionFeed(feedConfig.feed);
+      }
+    });
+  };
+
   const registry = window.grapesjsCkeditorData && window.grapesjsCkeditorData.optionsRegistry;
   const options = registry && optionsKey ? registry[optionsKey] : {};
   if (registry && optionsKey) {
@@ -156,26 +180,7 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
   }
 
   // Cross-frame iterable fix: Ensure mention feeds return a local array (iterable in this window)
-  if (options && options.mention && Array.isArray(options.mention.feeds)) {
-    options.mention.feeds.forEach(feedConfig => {
-      if (typeof feedConfig.feed === 'function') {
-        const originalFeed = feedConfig.feed;
-        feedConfig.feed = (queryText) => {
-          return new Promise(resolve => {
-            const result = originalFeed(queryText);
-            // Handle both Promise and synchronous result
-            Promise.resolve(result).then(items => {
-              // Convert to local array to ensure it has valid Symbol.iterator in this iframe context
-              resolve(Array.from(items));
-            }).catch(err => {
-              console.error('Mention feed error:', err);
-              resolve([]);
-            });
-          });
-        };
-      }
-    });
-  }
+  normalizeMentionFeeds(options && options.mention ? options.mention : null);
 
 
   /**
