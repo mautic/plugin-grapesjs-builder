@@ -70,7 +70,9 @@ class GrapesJsController extends CommonController
     }
 
     /**
-     * @return array<mixed, mixed>|null
+     * @param array<string, mixed> $content
+     *
+     * @return array<string, mixed>|null
      */
     private function extractEditorStateFromContent(array $content): ?array
     {

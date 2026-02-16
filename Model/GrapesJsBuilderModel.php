@@ -79,6 +79,9 @@ class GrapesJsBuilderModel extends AbstractCommonModel
         $this->handlePageEntity($page, $data);
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     private function handleEmailEntity(Email $entity, array $data, Request $request): void
     {
         if ($this->emailModel->isUpdatingTranslationChildren()) {
@@ -109,6 +112,9 @@ class GrapesJsBuilderModel extends AbstractCommonModel
         $this->emailModel->getRepository()->saveEntity($entity);
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     private function handlePageEntity(Page $entity, array $data): void
     {
         if (!$this->updateEntityEditorState($entity, $data)) {
@@ -119,6 +125,9 @@ class GrapesJsBuilderModel extends AbstractCommonModel
         $this->em->flush();
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     private function hasEditorStatePayload(array $data): bool
     {
         return array_key_exists('editorState', $data);
@@ -182,6 +191,9 @@ class GrapesJsBuilderModel extends AbstractCommonModel
         return $content;
     }
 
+    /**
+     * @param array<string, mixed> $data
+     */
     private function updateEntityEditorState(Email|Page $entity, array $data): bool
     {
         if (!$this->hasEditorStatePayload($data)) {
