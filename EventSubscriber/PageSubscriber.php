@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace MauticPlugin\GrapesJsBuilderBundle\EventSubscriber;
 
-use Mautic\PageBundle\PageEvents;
 use Mautic\PageBundle\Event\PageEvent;
+use Mautic\PageBundle\PageEvents;
 use MauticPlugin\GrapesJsBuilderBundle\Integration\Config;
 use MauticPlugin\GrapesJsBuilderBundle\Model\GrapesJsBuilderModel;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -31,6 +31,6 @@ class PageSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $this->grapesJsBuilderModel->addOrEditEntity($event->getPage());
+        $this->grapesJsBuilderModel->addOrEditPageEntity($event->getPage());
     }
 }

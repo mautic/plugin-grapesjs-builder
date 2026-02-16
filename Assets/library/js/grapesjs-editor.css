@@ -11,10 +11,6 @@ li::marker {
   font-weight: inherit !important;
 }
 
-ul,
-ol {
-}
-
 ol {
   list-style-type: decimal !important;
 }

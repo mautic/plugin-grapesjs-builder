@@ -30,43 +30,73 @@ class GrapesJsController extends CommonController
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<mixed, mixed>
      */
     private function normalizeContentToArray(mixed $content): array
     {
-        $normalizedContent = [];
-
         if (is_array($content)) {
-            $normalizedContent = $content;
-        } elseif (is_string($content)) {
-            $decoded = json_decode($content, true);
-            if (JSON_ERROR_NONE === json_last_error() && is_array($decoded)) {
-                $normalizedContent = $decoded;
-            } else {
-                $unserialized = @unserialize($content);
-                if (false !== $unserialized && is_array($unserialized)) {
-                    $normalizedContent = $unserialized;
-                }
-            }
+            return $content;
         }
 
-        return $normalizedContent;
+        if (!is_string($content) || '' === $content) {
+            return [];
+        }
+
+        try {
+            $decoded = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        } catch (\JsonException) {
+        }
+
+        if (!str_starts_with($content, 'a:')) {
+            return [];
+        }
+
+        set_error_handler(static function (int $severity, string $message, string $file, int $line): never {
+            throw new \ErrorException($message, 0, $severity, $file, $line);
+        });
+
+        try {
+            $unserialized = unserialize($content, ['allowed_classes' => false]);
+        } catch (\Throwable) {
+            return [];
+        } finally {
+            restore_error_handler();
+        }
+
+        return is_array($unserialized) ? $unserialized : [];
     }
 
-    private function extractEditorStateFromContent(array $content): mixed
+    /**
+     * @return array<mixed, mixed>|null
+     */
+    private function extractEditorStateFromContent(array $content): ?array
     {
-        $editorState   = null;
         $builderConfig = $content['grapesjsbuilder'] ?? null;
 
-        if (is_array($builderConfig)) {
-            if (array_key_exists('editorState', $builderConfig)) {
-                $editorState = $builderConfig['editorState'];
-            } elseif (array_key_exists('projectData', $builderConfig)) {
-                $editorState = $builderConfig['projectData'];
-            }
+        if (!is_array($builderConfig)) {
+            return null;
         }
 
-        return $editorState;
+        $editorState = $builderConfig['editorState'] ?? null;
+
+        if (is_array($editorState)) {
+            return $editorState;
+        }
+
+        if (!is_string($editorState) || '' === trim($editorState)) {
+            return null;
+        }
+
+        try {
+            $decodedEditorState = json_decode($editorState, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+
+        return is_array($decodedEditorState) ? $decodedEditorState : null;
     }
 
     public function builderAction(
@@ -111,16 +141,16 @@ class GrapesJsController extends CommonController
             }
         }
 
-        $type         = 'html';
-        $template     = InputHelper::clean($request->query->get('template'));
-        $resetProject = $request->query->getBoolean('resetProject', false);
+        $type             = 'html';
+        $template         = InputHelper::clean($request->query->get('template'));
+        $resetEditorState = $request->query->getBoolean('resetEditorState', false);
         if (!$template) {
             $mauticLogger->warning('Grapesjs: no template in query');
 
             return $this->json(false);
         }
         $templateName = '@themes/'.$template.'/html/'.$objectType;
-        $content      = $resetProject ? [] : $entity->getContent();
+        $content      = $resetEditorState ? [] : $entity->getContent();
 
         // Check for MJML template
         // @deprecated - use mjml directly in email.html.twig
@@ -168,7 +198,7 @@ class GrapesJsController extends CommonController
             throw new ConflictHttpException('Object not authorized to load custom builder');
         }
 
-        if (str_contains((string) $objectId, 'new')) {
+        if (str_contains($objectId, 'new')) {
             return $this->json(['editorState' => null]);
         }
 
@@ -197,7 +227,7 @@ class GrapesJsController extends CommonController
     /**
      * @deprecated deprecated since version 5.0 - use mjml directly in email.html.twig
      */
-    private function checkForMjmlTemplate(string $template): ?string
+    private function checkForMjmlTemplate($template)
     {
         $twig = $this->container->get('twig');
 

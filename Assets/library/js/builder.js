@@ -73,7 +73,7 @@ function setThemeHtml(theme) {
     url: mQuery('#builder_url').val(),
     data: {
       template: theme,
-      resetProject: 1,
+      resetEditorState: 1,
     },
     dataType: 'json',
     success(response) {

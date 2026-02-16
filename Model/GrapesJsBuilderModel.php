@@ -55,9 +55,9 @@ class GrapesJsBuilderModel extends AbstractCommonModel
     }
 
     /**
-     * Add or edit entity settings based on request. Supports `Email` and `Page`.
+     * Add or edit email settings based on request.
      */
-    public function addOrEditEntity(object $entity): void
+    public function addOrEditEntity(Email $email): void
     {
         $currentRequest = $this->requestStack->getCurrentRequest();
         if (!$currentRequest || !$currentRequest->request->has('grapesjsbuilder')) {
@@ -65,19 +65,18 @@ class GrapesJsBuilderModel extends AbstractCommonModel
         }
 
         $data = $currentRequest->request->all('grapesjsbuilder');
-        if (!is_array($data)) {
+        $this->handleEmailEntity($email, $data, $currentRequest);
+    }
+
+    public function addOrEditPageEntity(Page $page): void
+    {
+        $currentRequest = $this->requestStack->getCurrentRequest();
+        if (!$currentRequest || !$currentRequest->request->has('grapesjsbuilder')) {
             return;
         }
 
-        if ($entity instanceof Email) {
-            $this->handleEmailEntity($entity, $data, $currentRequest);
-
-            return;
-        }
-
-        if ($entity instanceof Page) {
-            $this->handlePageEntity($entity, $data);
-        }
+        $data = $currentRequest->request->all('grapesjsbuilder');
+        $this->handlePageEntity($page, $data);
     }
 
     private function handleEmailEntity(Email $entity, array $data, Request $request): void
@@ -100,10 +99,10 @@ class GrapesJsBuilderModel extends AbstractCommonModel
         $this->updateEntityEditorState($entity, $data);
         $this->getRepository()->saveEntity($grapesJsBuilder);
 
-        $emailForm  = $request->get('emailform');
+        $emailForm  = $request->request->all('emailform');
         $customHtml = is_array($emailForm) ? ($emailForm['customHtml'] ?? null) : null;
         if (null === $customHtml) {
-            $customHtml = $request->get('customHtml') ?? null;
+            $customHtml = $request->request->get('customHtml') ?? null;
         }
 
         $entity->setCustomHtml($customHtml);
@@ -122,21 +121,28 @@ class GrapesJsBuilderModel extends AbstractCommonModel
 
     private function hasEditorStatePayload(array $data): bool
     {
-        return array_key_exists('editorState', $data) || array_key_exists('projectData', $data);
+        return array_key_exists('editorState', $data);
     }
 
-    private function decodeEditorState(mixed $editorState): mixed
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function decodeEditorState(mixed $editorState): ?array
     {
-        if (!is_string($editorState)) {
+        if (is_array($editorState)) {
             return $editorState;
         }
 
+        if (!is_string($editorState) || '' === trim($editorState)) {
+            return null;
+        }
+
         $decoded = json_decode($editorState, true);
-        if (JSON_ERROR_NONE === json_last_error()) {
+        if (JSON_ERROR_NONE === json_last_error() && is_array($decoded)) {
             return $decoded;
         }
 
-        return $editorState;
+        return null;
     }
 
     /**
@@ -159,11 +165,12 @@ class GrapesJsBuilderModel extends AbstractCommonModel
     }
 
     /**
-     * @param array<string, mixed> $content
+     * @param array<string, mixed>      $content
+     * @param array<string, mixed>|null $editorState
      *
      * @return array<string, mixed>
      */
-    private function mergeEditorStateIntoContent(array $content, mixed $editorState): array
+    private function mergeEditorStateIntoContent(array $content, ?array $editorState): array
     {
         if (!isset($content['grapesjsbuilder']) || !is_array($content['grapesjsbuilder'])) {
             $content['grapesjsbuilder'] = [];
@@ -181,7 +188,7 @@ class GrapesJsBuilderModel extends AbstractCommonModel
             return false;
         }
 
-        $rawEditorState = $data['editorState'] ?? $data['projectData'] ?? null;
+        $rawEditorState = $data['editorState'] ?? null;
         $editorState    = $this->decodeEditorState($rawEditorState);
         $content        = $this->normalizeContent($entity->getContent());
         $entity->setContent($this->mergeEditorStateIntoContent($content, $editorState));

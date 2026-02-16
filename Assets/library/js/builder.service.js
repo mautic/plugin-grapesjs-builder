@@ -24,6 +24,7 @@ import CodeModeButton from './codeMode/codeMode.button';
 import CompCopyPaste from './commands/compCopyPaste';
 import MjmlService from 'grapesjs-preset-mautic/dist/mjml/mjml.service';
 import MjmlStylesService from './mjmlStyles.service';
+import EditorStateService from './editorState.service';
 
 export default class BuilderService {
   editor;
@@ -32,13 +33,15 @@ export default class BuilderService {
 
   assetService;
 
-  projectField;
+  editorStateField;
 
-  pendingProjectData;
+  pendingEditorState;
 
   context;
 
-  projectDataLoaded;
+  editorStateLoaded;
+
+  editorStateService;
 
   typographySector;
 
@@ -51,10 +54,14 @@ export default class BuilderService {
    */
   constructor(assetService) {
     this.assetService = assetService;
-    this.projectField = null;
-    this.pendingProjectData = null;
+    this.editorStateField = null;
+    this.pendingEditorState = null;
     this.context = null;
-    this.projectDataLoaded = false;
+    this.editorStateLoaded = false;
+    this.editorStateService = new EditorStateService({
+      setFieldValue: (value) => this.setEditorStateFieldValue(value),
+      setContextReset: (context, resetEditorState) => this.setContextEditorStateReset(context, resetEditorState),
+    });
     this.typographySector = null;
     this.typographySectorInitialized = false;
     this.typographySectorTimeout = null;
@@ -113,7 +120,7 @@ export default class BuilderService {
       entityId,
       objectType,
       editorStateUrl: builderRouteContext ? builderRouteContext.editorStateUrl : null,
-      resetProject: !!(form && form.dataset && form.dataset.grapesjsbuilderReset === 'true'),
+      resetEditorState: !!(form && form.dataset && form.dataset.grapesjsbuilderReset === 'true'),
     };
   }
 
@@ -215,7 +222,7 @@ export default class BuilderService {
       this.context.objectType = objectType;
       this.context.objectId = entityId;
       this.context.entityId = entityId;
-      this.context.resetProject = false;
+      this.context.resetEditorState = false;
       if (this.context.form) {
         this.context.form.dataset.grapesjsbuilderReset = 'false';
       }
@@ -225,203 +232,70 @@ export default class BuilderService {
     }
   }
 
-  ensureProjectField(context) {
-    if (!context || !context.form) {
-      return null;
-    }
-
-    const existingEditorStateField = context.form.querySelector('textarea.builder-json[name="grapesjsbuilder[editorState]"]');
-    if (existingEditorStateField) {
-      return existingEditorStateField;
-    }
-
-    const existingProjectField = context.form.querySelector('textarea.builder-json[name="grapesjsbuilder[projectData]"]');
-    if (existingProjectField) {
-      existingProjectField.name = 'grapesjsbuilder[editorState]';
-      existingProjectField.id = 'grapesjsbuilder_editorState';
-      return existingProjectField;
-    }
-
-    const field = document.createElement('textarea');
-    field.name = 'grapesjsbuilder[editorState]';
-    field.id = 'grapesjsbuilder_editorState';
-    field.className = 'builder-json hide';
-    field.style.display = 'none';
-    context.form.appendChild(field);
-
-    return field;
-  }
-
-  setProjectFieldValue(value) {
-    if (!this.projectField) {
+  setEditorStateFieldValue(value) {
+    if (!this.editorStateField) {
       return;
     }
 
-    this.projectField.value = value;
+    this.editorStateField.value = value;
   }
 
-  safeParseProjectData(value) {
-    if (!value || !value.trim()) {
-      return null;
-    }
-
-    try {
-      const parsed = JSON.parse(value);
-      return typeof parsed === 'object' && parsed !== null ? parsed : null;
-    } catch (error) {
-      console.warn('Unable to parse GrapesJS project data', error);
-      return null;
-    }
-  }
-
-  resolveEditorStateRoute(context) {
-    if (!context) {
-      return null;
-    }
-
-    if (context.editorStateUrl) {
-      return context.editorStateUrl;
-    }
-
-    if (!context.objectType || !context.entityId) {
-      return null;
-    }
-
-    const baseUrl = typeof mauticBaseUrl === 'string' && mauticBaseUrl.length > 0 ? mauticBaseUrl : '/';
-    const normalizedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-    const requestUrl = new URL(`s/grapesjsbuilder/${context.objectType}/${context.entityId}/editor-state`, `${window.location.origin}${normalizedBase}`);
-
-    return requestUrl.toString();
-  }
-
-  setContextProjectReset(context, resetProject) {
+  setContextEditorStateReset(context, resetEditorState) {
     if (!context) {
       return;
     }
 
     if (context.form) {
-      context.form.dataset.grapesjsbuilderReset = resetProject ? 'true' : 'false';
+      context.form.dataset.grapesjsbuilderReset = resetEditorState ? 'true' : 'false';
     }
 
-    context.resetProject = resetProject;
+    context.resetEditorState = resetEditorState;
   }
 
-  extractEditorStateFromPayload(payload) {
-    if (!payload || typeof payload !== 'object') {
-      return null;
-    }
-
-    return payload.editorState ?? payload.projectData ?? null;
-  }
-
-  applyPrefilledEditorState(editorState, context) {
-    if (typeof editorState === 'string') {
-      const parsed = this.safeParseProjectData(editorState);
-      if (parsed) {
-        this.setProjectFieldValue(JSON.stringify(parsed));
-        this.setContextProjectReset(context, false);
-
-        return parsed;
-      }
-
-      this.setProjectFieldValue(editorState);
-
-      return null;
-    }
-
-    if (editorState && typeof editorState === 'object') {
-      this.setProjectFieldValue(JSON.stringify(editorState));
-      this.setContextProjectReset(context, false);
-
-      return editorState;
-    }
-
-    this.setProjectFieldValue('');
-
-    return null;
-  }
-
-  async prefillProjectField(context) {
-    if (!context || context.resetProject || !context.entityId) {
-      this.setProjectFieldValue('');
-      return null;
-    }
-
-    const route = this.resolveEditorStateRoute(context);
-    if (!route) {
-      this.setProjectFieldValue('');
-      return null;
-    }
-
-    try {
-      const response = await fetch(route, {
-        credentials: 'same-origin',
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-      });
-
-      if (!response.ok) {
-        this.setProjectFieldValue('');
-        return null;
-      }
-
-      const payload = await response.json();
-      const editorState = this.extractEditorStateFromPayload(payload);
-
-      return this.applyPrefilledEditorState(editorState, context);
-    } catch (error) {
-      console.warn('Unable to fetch GrapesJS project data', error);
-      this.setProjectFieldValue('');
-
-      return null;
-    }
-  }
-
-  loadProjectData(projectData) {
-    if (!projectData || !this.editor || typeof this.editor.loadProjectData !== 'function') {
+  loadEditorState(editorState) {
+    if (!editorState || !this.editor || typeof this.editor.loadProjectData !== 'function') {
       return;
     }
 
     try {
-      this.editor.loadProjectData(projectData);
-      this.projectDataLoaded = true;
+      this.editor.loadProjectData(editorState);
+      this.editorStateLoaded = true;
     } catch (error) {
-      console.warn('Unable to load GrapesJS project data into the editor', error);
+      console.warn('Unable to load GrapesJS editor state into the editor', error);
     }
   }
 
-  persistProjectData() {
-    if (!this.projectField || !this.editor || typeof this.editor.getProjectData !== 'function') {
+  persistEditorState() {
+    if (!this.editorStateField || !this.editor || typeof this.editor.getProjectData !== 'function') {
       return;
     }
 
     try {
-      const projectData = this.editor.getProjectData();
-      if (projectData && typeof projectData === 'object') {
-        const serialized = JSON.stringify(projectData);
-        this.setProjectFieldValue(serialized);
-        this.pendingProjectData = projectData;
-        this.projectDataLoaded = true;
+      const editorState = this.editor.getProjectData();
+      if (editorState && typeof editorState === 'object') {
+        const serialized = JSON.stringify(editorState);
+        this.setEditorStateFieldValue(serialized);
+        this.pendingEditorState = editorState;
+        this.editorStateLoaded = true;
         if (this.context && this.context.form) {
           this.context.form.dataset.grapesjsbuilderReset = 'false';
         }
         if (this.context) {
-          this.context.resetProject = false;
+          this.context.resetEditorState = false;
         }
       } else {
-        this.setProjectFieldValue('');
-        this.pendingProjectData = null;
-        this.projectDataLoaded = false;
+        this.setEditorStateFieldValue('');
+        this.pendingEditorState = null;
+        this.editorStateLoaded = false;
         if (this.context && this.context.form) {
           this.context.form.dataset.grapesjsbuilderReset = 'false';
         }
         if (this.context) {
-          this.context.resetProject = false;
+          this.context.resetEditorState = false;
         }
       }
     } catch (error) {
-      console.warn('Unable to collect GrapesJS project data from the editor', error);
+      console.warn('Unable to collect GrapesJS editor state from the editor', error);
     }
   }
 
@@ -476,6 +350,10 @@ export default class BuilderService {
       });
     });
 
+    this.editor.on('asset:upload:error', (error) => {
+      Mautic.setFlashes(Mautic.addErrorFlashMessage(error));
+    });
+
     this.editor.on('asset:open', () => {
       const editor = this.editor;
       const assetsService = this.assetService;
@@ -525,7 +403,7 @@ export default class BuilderService {
     });
 
     const triggerBuilderHide = () => {
-      this.persistProjectData();
+      this.persistEditorState();
       // trigger hide event on DOM element
       mQuery('.builder').trigger('builder:hide', [this.editor]);
       // trigger hide event on editor instance
@@ -536,8 +414,8 @@ export default class BuilderService {
       const $form = mQuery(this.context.form);
       $form
         .off('submit.grapesjsbuilder form-pre-serialize.grapesjsbuilder submit:success.grapesjsbuilder')
-        .on('submit.grapesjsbuilder', () => this.persistProjectData())
-        .on('form-pre-serialize.grapesjsbuilder', () => this.persistProjectData())
+        .on('submit.grapesjsbuilder', () => this.persistEditorState())
+        .on('form-pre-serialize.grapesjsbuilder', () => this.persistEditorState())
         .on('submit:success.grapesjsbuilder', (event, requestUrl, response) => {
           this.syncContextAfterFirstSave(requestUrl, response);
         });
@@ -545,7 +423,7 @@ export default class BuilderService {
     this.editor.on('run:mautic-editor-page-html-close', triggerBuilderHide);
     this.editor.on('run:mautic-editor-email-html-close', triggerBuilderHide);
     this.editor.on('run:mautic-editor-email-mjml-close', triggerBuilderHide);
-    this.editor.on('run:preset-mautic:apply-form', () => this.persistProjectData());
+    this.editor.on('run:preset-mautic:apply-form', () => this.persistEditorState());
 
     this.editor.on('load', () => this.setupTypographySectorVisibility());
     this.setupTypographySectorVisibility();
@@ -561,13 +439,13 @@ export default class BuilderService {
    */
   initGrapesJS(object) {
     this.context = this.getContext(object);
-    this.projectField = this.ensureProjectField(this.context);
-    this.pendingProjectData = null;
-    this.projectDataLoaded = false;
+    this.editorStateField = this.editorStateService.ensureEditorStateField(this.context);
+    this.pendingEditorState = null;
+    this.editorStateLoaded = false;
 
-    const projectPrefetch = this.context.resetProject
+    const editorStatePrefetch = this.context.resetEditorState
       ? null
-      : this.prefillProjectField(this.context);
+      : this.editorStateService.prefillEditorStateField(this.context);
 
     // grapesjs-custom-plugins: add globally defined mautic-grapesjs-plugins using name as pluginId for the plugin-function
     if (window.MauticGrapesJsPlugins) {
@@ -601,29 +479,29 @@ export default class BuilderService {
     }
 
     this.editor.on('load', () => {
-      if (!this.projectDataLoaded && this.pendingProjectData) {
-        this.loadProjectData(this.pendingProjectData);
+      if (!this.editorStateLoaded && this.pendingEditorState) {
+        this.loadEditorState(this.pendingEditorState);
       }
     });
 
-    if (projectPrefetch && typeof projectPrefetch.then === 'function') {
-      projectPrefetch.then((projectData) => {
-        if (projectData && typeof projectData === 'object') {
-          this.pendingProjectData = projectData;
-          if (!this.projectDataLoaded && this.editor) {
-            this.loadProjectData(projectData);
+    if (editorStatePrefetch && typeof editorStatePrefetch.then === 'function') {
+      editorStatePrefetch.then((editorState) => {
+        if (editorState && typeof editorState === 'object') {
+          this.pendingEditorState = editorState;
+          if (!this.editorStateLoaded && this.editor) {
+            this.loadEditorState(editorState);
           }
         }
       });
     }
 
-    if (this.context.resetProject) {
-      this.setProjectFieldValue('');
-      this.pendingProjectData = null;
+    if (this.context.resetEditorState) {
+      this.setEditorStateFieldValue('');
+      this.pendingEditorState = null;
       if (this.context.form) {
         this.context.form.dataset.grapesjsbuilderReset = 'false';
       }
-      this.context.resetProject = false;
+      this.context.resetEditorState = false;
     }
 
     // add code mode button

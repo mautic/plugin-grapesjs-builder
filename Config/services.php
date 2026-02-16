@@ -18,7 +18,7 @@ return function (ContainerConfigurator $configurator): void {
     ];
 
     $services->load('MauticPlugin\\GrapesJsBuilderBundle\\', '../')
-        ->exclude('../{' . implode(',', array_merge(MauticCoreExtension::DEFAULT_EXCLUDES, $excludes)) . '}');
+        ->exclude('../{'.implode(',', array_merge(MauticCoreExtension::DEFAULT_EXCLUDES, $excludes)).'}');
 
     $services->load('MauticPlugin\\GrapesJsBuilderBundle\\Entity\\', '../Entity/*Repository.php');
 
