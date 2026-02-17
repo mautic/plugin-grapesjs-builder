@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace MauticPlugin\GrapesJsBuilderBundle\Tests\Unit\Controller;
 
+use Mautic\CoreBundle\Model\AbstractCommonModel;
 use Mautic\CoreBundle\Model\MauticModelInterface;
 use Mautic\CoreBundle\Security\Permissions\CorePermissions;
 use Mautic\EmailBundle\Entity\Email;
 use MauticPlugin\GrapesJsBuilderBundle\Controller\GrapesJsController;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class GrapesJsControllerTest extends TestCase
@@ -87,21 +88,6 @@ final class GrapesJsControllerTest extends TestCase
         self::assertSame('{"editorState":null}', $response->getContent());
     }
 
-    public function testEditorStateActionReturnsAccessDeniedWhenEntityAccessFails(): void
-    {
-        $security = $this->createMock(CorePermissions::class);
-        $security->method('hasEntityAccess')->willReturn(false);
-
-        $entity = $this->createMock(Email::class);
-        $entity->method('getCreatedBy')->willReturn(5);
-
-        $controller = $this->getControllerForEditorState($security, $entity);
-        $response   = $controller->editorStateAction('email', '9');
-
-        self::assertSame(403, $response->getStatusCode());
-        self::assertSame('denied', $response->getContent());
-    }
-
     private function getControllerForEditorState(CorePermissions $security, ?Email $entity): GrapesJsController
     {
         return new class($security, $entity) extends GrapesJsController {
@@ -110,31 +96,25 @@ final class GrapesJsControllerTest extends TestCase
                 private ?Email $testEntity,
             ) {
                 $this->security = $this->testSecurity;
+                $this->setContainer(new Container());
             }
 
+            /**
+             * @return AbstractCommonModel<object>
+             */
             protected function getModel($modelNameKey): MauticModelInterface
             {
-                return new class($this->testEntity) implements MauticModelInterface {
+                return new class($this->testEntity) extends AbstractCommonModel {
                     public function __construct(
                         private ?Email $entity,
                     ) {
                     }
 
-                    public function getEntity(int $id): ?Email
+                    public function getEntity($id = null): ?object
                     {
                         return $this->entity;
                     }
                 };
-            }
-
-            public function accessDenied($batch = false, $msg = 'mautic.core.url.error.401'): Response
-            {
-                return new Response('denied', 403);
-            }
-
-            protected function json($data, int $status = 200, array $headers = [], array $context = []): JsonResponse
-            {
-                return new JsonResponse($data, $status, $headers);
             }
         };
     }

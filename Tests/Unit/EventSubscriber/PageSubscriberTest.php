@@ -14,8 +14,10 @@ use PHPUnit\Framework\TestCase;
 
 final class PageSubscriberTest extends TestCase
 {
-    private Config|MockObject $config;
-    private GrapesJsBuilderModel|MockObject $model;
+    /** @var MockObject&Config */
+    private MockObject $config;
+    /** @var MockObject&GrapesJsBuilderModel */
+    private MockObject $model;
     private PageSubscriber $subscriber;
 
     protected function setUp(): void
