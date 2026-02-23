@@ -49,6 +49,8 @@ export default class BuilderService {
 
   typographySectorTimeout;
 
+  optimisticLockVersion;
+
   /**
    * @param {AssetService} assetService
    */
@@ -65,6 +67,7 @@ export default class BuilderService {
     this.typographySector = null;
     this.typographySectorInitialized = false;
     this.typographySectorTimeout = null;
+    this.optimisticLockVersion = null;
 
     this.patchMjmlService();
   }
@@ -252,6 +255,93 @@ export default class BuilderService {
     context.resetEditorState = resetEditorState;
   }
 
+  getOptimisticLockField() {
+    if (!this.context || !this.context.form || !this.context.formName) {
+      return null;
+    }
+
+    return this.context.form.querySelector(`[name="${this.context.formName}[version]"]`);
+  }
+
+  cacheOptimisticLockVersion() {
+    const versionField = this.getOptimisticLockField()
+      || (this.context && this.context.formName
+        ? document.getElementById(`${this.context.formName}_version`)
+        : null);
+    if (!versionField) {
+      return;
+    }
+
+    const rawValue = typeof versionField.value === 'string' ? versionField.value.trim() : `${versionField.value || ''}`.trim();
+    if (rawValue) {
+      this.optimisticLockVersion = rawValue;
+    }
+  }
+
+  resolveOptimisticLockVersion() {
+    const byName = this.getOptimisticLockField();
+    const byId = this.context && this.context.formName
+      ? document.getElementById(`${this.context.formName}_version`)
+      : null;
+    const fallbackInForm = this.context && this.context.form
+      ? this.context.form.querySelector('input[name$="[version]"]')
+      : null;
+
+    const candidates = [byName, byId, fallbackInForm];
+    for (let index = 0; index < candidates.length; index += 1) {
+      const candidate = candidates[index];
+      if (!candidate) {
+        continue;
+      }
+
+      const value = typeof candidate.value === 'string'
+        ? candidate.value.trim()
+        : `${candidate.value || ''}`.trim();
+
+      if (value) {
+        return value;
+      }
+    }
+
+    if (this.optimisticLockVersion) {
+      return this.optimisticLockVersion;
+    }
+
+    return '1';
+  }
+
+  ensureOptimisticLockVersion() {
+    if (!this.context || !this.context.form || !this.context.formName) {
+      return;
+    }
+
+    const resolvedVersion = this.resolveOptimisticLockVersion();
+    this.optimisticLockVersion = resolvedVersion;
+
+    let versionField = this.getOptimisticLockField();
+
+    if (!versionField) {
+      versionField = document.createElement('input');
+      versionField.type = 'hidden';
+      versionField.name = `${this.context.formName}[version]`;
+      versionField.id = `${this.context.formName}_version`;
+      versionField.value = resolvedVersion;
+      this.context.form.appendChild(versionField);
+      return;
+    }
+
+    const currentValue = typeof versionField.value === 'string' ? versionField.value.trim() : `${versionField.value || ''}`.trim();
+
+    if (!currentValue && resolvedVersion) {
+      versionField.value = resolvedVersion;
+      return;
+    }
+
+    if (currentValue) {
+      this.optimisticLockVersion = currentValue;
+    }
+  }
+
   loadEditorState(editorState) {
     if (!editorState || !this.editor || typeof this.editor.loadProjectData !== 'function') {
       return;
@@ -266,6 +356,8 @@ export default class BuilderService {
   }
 
   persistEditorState() {
+    this.ensureOptimisticLockVersion();
+
     if (!this.editorStateField || !this.editor || typeof this.editor.getProjectData !== 'function') {
       return;
     }
@@ -439,6 +531,7 @@ export default class BuilderService {
    */
   initGrapesJS(object) {
     this.context = this.getContext(object);
+    this.cacheOptimisticLockVersion();
     this.editorStateField = this.editorStateService.ensureEditorStateField(this.context);
     this.pendingEditorState = null;
     this.editorStateLoaded = false;
@@ -723,6 +816,7 @@ export default class BuilderService {
           inline: inlineElements,
           inline_options: pageInlineOptions,
           options: pageCkEditorOptions,
+          reuse_editor: false,
           toolbar_max_width: '445px',
           inline_toolbar_max_width: '360px',
           theme_alias: BuilderService.getActiveThemeAlias(),
@@ -792,6 +886,7 @@ export default class BuilderService {
           inline: inlineElements,
           inline_options: emailInlineOptions,
           options: emailCkEditorOptions,
+          reuse_editor: false,
           toolbar_max_width: '445px',
           inline_toolbar_max_width: '360px',
           theme_alias: BuilderService.getActiveThemeAlias(),
@@ -893,6 +988,7 @@ export default class BuilderService {
           inline: inlineElements,
           inline_options: emailInlineOptions,
           options: emailCkEditorOptions,
+          reuse_editor: false,
           toolbar_max_width: '445px',
           inline_toolbar_max_width: '360px',
           theme_alias: BuilderService.getActiveThemeAlias(),
@@ -994,9 +1090,19 @@ export default class BuilderService {
    * @link https://grapesjs.com/docs/modules/Assets.html#configuration
    */
   getAssetManagerConf() {
+    const noAssetsTranslationKey = 'grapesjsbuilder.assetManager.noAssets';
+    const translatedNoAssets = Mautic.translate(noAssetsTranslationKey);
+    const noAssetsMessage = (translatedNoAssets && translatedNoAssets !== noAssetsTranslationKey)
+      ? translatedNoAssets
+      : 'No assets here, drop files to upload';
+    const normalizedNoAssetsMessage = noAssetsMessage
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
     return {
       assets: [],
-      noAssets: Mautic.translate('grapesjsbuilder.assetManager.noAssets'),
+      noAssets: normalizedNoAssetsMessage,
       upload: this.assetService.getUploadPath(),
       uploadName: 'files',
       multiUpload: 1,

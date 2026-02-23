@@ -189,6 +189,7 @@ export const themeConfigMixin = {
    */
   resetFontConfigState() {
     this._Ck5ForGrapesJsData.fontFamilyOptions = [];
+    this._Ck5ForGrapesJsData.fontSizeOptions = [];
     this._Ck5ForGrapesJsData.fontStylesheets = [];
     this._Ck5ForGrapesJsData.headingOptions = [];
     this._Ck5ForGrapesJsData.styleDefinitions = [];
@@ -222,6 +223,146 @@ export const themeConfigMixin = {
     config.supportAllValues = false;
 
     return config;
+  },
+
+  /**
+   * Merges custom font size options with the base configuration.
+   * Keeps supportAllValues enabled so users can type custom numeric values.
+   *
+   * @param {Object} baseConfig - The base font size configuration
+   * @returns {Object}
+   */
+  mergeFontSizeOptions(baseConfig) {
+    const config = baseConfig ? { ...baseConfig } : {};
+    const remoteOptions = Array.isArray(this.fontSizeOptions) ? this.fontSizeOptions : [];
+    const baseOptions = Array.isArray(config.options) ? config.options : [];
+    const mergedOptions = [];
+
+    const registerOption = option => {
+      const normalized = this.normalizeFontSizeOption(option);
+      if (!normalized) {
+        return;
+      }
+
+      if (!this.containsFontSizeOption(mergedOptions, normalized)) {
+        mergedOptions.push(normalized);
+      }
+    };
+
+    baseOptions.forEach(registerOption);
+    remoteOptions.forEach(registerOption);
+
+    if (mergedOptions.length) {
+      config.options = mergedOptions;
+    }
+
+    config.supportAllValues = true;
+
+    return config;
+  },
+
+  /**
+   * Normalizes a font size option into a CKEditor-compatible value.
+   *
+   * @param {string|number|Object} option
+   * @returns {string|number|Object|null}
+   */
+  normalizeFontSizeOption(option) {
+    if (typeof option === 'number' && Number.isFinite(option)) {
+      return option;
+    }
+
+    if (typeof option === 'string') {
+      const normalized = option.trim();
+      return normalized || null;
+    }
+
+    if (!option || typeof option !== 'object') {
+      return null;
+    }
+
+    const normalized = { ...option };
+
+    if (typeof normalized.model === 'string') {
+      normalized.model = normalized.model.trim();
+    }
+
+    if (typeof normalized.title === 'string') {
+      normalized.title = normalized.title.trim();
+    }
+
+    if (normalized.model === '') {
+      delete normalized.model;
+    }
+
+    if (normalized.title === '') {
+      delete normalized.title;
+    }
+
+    if (normalized.model === undefined) {
+      if (typeof normalized.title === 'string' && normalized.title) {
+        normalized.model = normalized.title;
+      } else {
+        return null;
+      }
+    }
+
+    if (normalized.title === undefined) {
+      normalized.title = typeof normalized.model === 'string' ? normalized.model : `${normalized.model}`;
+    }
+
+    return normalized;
+  },
+
+  /**
+   * Checks if a font size option collection contains a candidate.
+   *
+   * @param {Array} collection
+   * @param {string|number|Object} candidate
+   * @returns {boolean}
+   */
+  containsFontSizeOption(collection, candidate) {
+    return collection.some(item => this.fontSizeOptionEquals(item, candidate));
+  },
+
+  /**
+   * Compares two font size options.
+   *
+   * @param {string|number|Object} optionA
+   * @param {string|number|Object} optionB
+   * @returns {boolean}
+   */
+  fontSizeOptionEquals(optionA, optionB) {
+    const normalize = option => {
+      if (typeof option === 'number' && Number.isFinite(option)) {
+        return `${option}`;
+      }
+
+      if (typeof option === 'string') {
+        return option.trim();
+      }
+
+      if (option && typeof option === 'object') {
+        if (typeof option.model === 'number' && Number.isFinite(option.model)) {
+          return `${option.model}`;
+        }
+
+        if (typeof option.model === 'string') {
+          return option.model.trim();
+        }
+
+        if (typeof option.title === 'string') {
+          return option.title.trim();
+        }
+      }
+
+      return null;
+    };
+
+    const normalizedA = normalize(optionA);
+    const normalizedB = normalize(optionB);
+
+    return normalizedA !== null && normalizedB !== null && normalizedA === normalizedB;
   },
 
   /**
@@ -293,10 +434,6 @@ export const themeConfigMixin = {
    */
   mergeHeadingOptions(baseConfig) {
     const remoteOptions = Array.isArray(this.headingOptions) ? this.headingOptions : [];
-    if (!remoteOptions.length) {
-      return baseConfig || null;
-    }
-
     const config = baseConfig ? { ...baseConfig } : {};
     const baseOptions = Array.isArray(config.options) ? config.options.map(option => this.cloneHeadingOption(option)) : [];
     const merged = baseOptions.slice();
@@ -317,6 +454,36 @@ export const themeConfigMixin = {
       }
     });
 
+    if (!merged.length) {
+      merged.push(
+        {
+          model: 'paragraph',
+          title: 'Paragraph',
+          class: 'ck-heading_paragraph'
+        },
+        {
+          model: 'heading1',
+          title: 'Heading 1',
+          class: 'ck-heading_heading1',
+          view: 'h1'
+        },
+        {
+          model: 'heading2',
+          title: 'Heading 2',
+          class: 'ck-heading_heading2',
+          view: 'h2'
+        },
+        {
+          model: 'heading3',
+          title: 'Heading 3',
+          class: 'ck-heading_heading3',
+          view: 'h3'
+        }
+      );
+    }
+
+    this.normalizeHeadingOptionViews(merged);
+
     if (!merged.some(item => this.normalizeHeadingModel(item && item.model) === 'paragraph')) {
       merged.unshift({
         model: 'paragraph',
@@ -327,6 +494,46 @@ export const themeConfigMixin = {
 
     config.options = merged;
     return config;
+  },
+
+  /**
+   * Normalizes heading option views to semantic tags (heading1 -> h1, etc).
+   *
+   * @param {Array} options
+   */
+  normalizeHeadingOptionViews(options) {
+    if (!Array.isArray(options)) {
+      return;
+    }
+
+    options.forEach(option => {
+      if (!option || typeof option !== 'object') {
+        return;
+      }
+
+      const model = this.normalizeHeadingModel(option.model);
+      const match = model.match(/^heading([1-6])$/);
+      if (!match) {
+        return;
+      }
+
+      const expectedTag = `h${match[1]}`;
+
+      if (typeof option.view === 'string') {
+        option.view = expectedTag;
+        return;
+      }
+
+      if (option.view && typeof option.view === 'object') {
+        option.view = {
+          ...option.view,
+          name: expectedTag
+        };
+        return;
+      }
+
+      option.view = expectedTag;
+    });
   },
 
   /**
@@ -863,6 +1070,50 @@ export const themeConfigMixin = {
   },
 
   /**
+   * Builds font size options from editor configuration.
+   *
+   * Supports:
+   * - editor.fontSizes: []
+   * - editor.font_sizes: []
+   * - editor.fontSize: { options: [] } or []
+   *
+   * @param {Object} data
+   * @returns {Array}
+   */
+  buildFontSizeOptions(data) {
+    const editorConfig = data && data.editor && typeof data.editor === 'object' ? data.editor : {};
+    const rawFontSizeConfig = editorConfig.fontSizes !== undefined
+      ? editorConfig.fontSizes
+      : (editorConfig.font_sizes !== undefined ? editorConfig.font_sizes : editorConfig.fontSize);
+
+    if (!rawFontSizeConfig) {
+      return [];
+    }
+
+    const rawOptions = Array.isArray(rawFontSizeConfig)
+      ? rawFontSizeConfig
+      : (rawFontSizeConfig && Array.isArray(rawFontSizeConfig.options) ? rawFontSizeConfig.options : []);
+
+    if (!rawOptions.length) {
+      return [];
+    }
+
+    const normalizedOptions = [];
+    rawOptions.forEach(option => {
+      const normalized = this.normalizeFontSizeOption(option);
+      if (!normalized) {
+        return;
+      }
+
+      if (!this.containsFontSizeOption(normalizedOptions, normalized)) {
+        normalizedOptions.push(normalized);
+      }
+    });
+
+    return normalizedOptions;
+  },
+
+  /**
    * Creates a style definition from a raw style object.
    *
    * @param {Object} style
@@ -973,6 +1224,7 @@ export const themeConfigMixin = {
 
         const parsed = this.extractEditorConfig(data);
         this._Ck5ForGrapesJsData.fontFamilyOptions = parsed.fontFamilyOptions;
+        this._Ck5ForGrapesJsData.fontSizeOptions = parsed.fontSizeOptions;
         this._Ck5ForGrapesJsData.fontStylesheets = parsed.fontStylesheets;
         this._Ck5ForGrapesJsData.headingOptions = parsed.headingOptions;
         this._Ck5ForGrapesJsData.styleDefinitions = parsed.styleDefinitions;
@@ -1055,9 +1307,11 @@ export const themeConfigMixin = {
 
     const headingOptions = this.buildHeadingOptions(data);
     const styleDefinitions = this.buildStyleDefinitions(data);
+    const fontSizeOptions = this.buildFontSizeOptions(data);
 
     return {
       fontFamilyOptions,
+      fontSizeOptions,
       fontStylesheets: uniqueStylesheets,
       headingOptions,
       styleDefinitions

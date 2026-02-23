@@ -170,6 +170,10 @@ export const normalizationMixin = {
    * @returns {WeakSet}
    */
   get managedLinkColorElements() {
+    if (!this._managedLinkColorElements) {
+      this._managedLinkColorElements = new WeakSet();
+    }
+
     return this._managedLinkColorElements;
   },
 
@@ -249,6 +253,9 @@ export const normalizationMixin = {
     }
 
     const managed = this.managedLinkColorElements;
+    if (!managed || typeof managed.add !== 'function' || typeof managed.has !== 'function') {
+      return;
+    }
     const anchors = root.querySelectorAll('a');
     anchors.forEach(anchor => {
       const descriptor = this.determineLinkColor(anchor);

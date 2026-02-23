@@ -86,9 +86,10 @@ class Ck5ForGrapesJs {
       badgableInfo: null,
       toolbarVisibilityInfo: null,
       parseContent: !!parse_content,
-      reuseEditor: reuse_editor !== undefined ? !!reuse_editor : true,
+      reuseEditor: reuse_editor !== undefined ? !!reuse_editor : false,
       fontConfigPromise: null,
       fontFamilyOptions: [],
+      fontSizeOptions: [],
       fontStylesheets: [],
       loadedFontStylesheets: [],
       headingOptions: [],
@@ -215,6 +216,10 @@ class Ck5ForGrapesJs {
 
   get fontFamilyOptions() {
     return this._Ck5ForGrapesJsData.fontFamilyOptions;
+  }
+
+  get fontSizeOptions() {
+    return this._Ck5ForGrapesJsData.fontSizeOptions;
   }
 
   get themeAlias() {

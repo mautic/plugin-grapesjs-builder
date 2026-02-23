@@ -623,54 +623,79 @@ export const editorLifecycleMixin = {
    * @param {string} src
    */
   injectEditorModule(src) {
-    createHtmlElem(
-      'style',
-      document.querySelector('head'),
-      {
-        innerHTML: `.gjs-rte-toolbar {opacity: 0;}`
-      }
-    );
-
-    let body = this.frameBody;
-    createHtmlElem(
-      'script',
-      body, {
-      src: src
-    }
-    ).onload =
-      () => setTimeout(
-        () => {
-          [...this.frameDoc.querySelectorAll('style')].find(
-            item => {
-              let innerHTML = item.innerHTML;
-              let match = innerHTML.match(/.ck.ck-editor__editable_inline ?{[^}]*(overflow:[^;]*;)[^}]*}/);
-              if (match) {
-                item.innerHTML = innerHTML.replace(match[0], '');
-                createHtmlElem(
-                  'style',
-                  item.parentNode,
-                  {
-                    innerHTML: `.ck-toolbar {border-bottom-width: 1px !important;}` +
-                      `.ck.ck-editor__editable.ck-focused:not(.ck-editor__nested-editable) {border: none !important;box-shadow: none !important;} 
-                       .ck.ck-dropdown .ck-dropdown__panel.ck-dropdown__panel-visible { max-height: 200px; overflow-y: auto; } `
-                  }
-                );
-              }
-              return match;
-            }
-          );
+    const hostHead = document.querySelector('head');
+    if (hostHead && !document.getElementById('grapesjs-ckeditor-toolbar-style')) {
+      createHtmlElem(
+        'style',
+        hostHead,
+        {
+          id: 'grapesjs-ckeditor-toolbar-style',
+          innerHTML: `.gjs-rte-toolbar {opacity: 0;}`
         }
       );
-    createHtmlElem(
-      'script',
-      body,
-      {
-        innerHTML: `${setElementProperty.toString()}; ${injectEditorInstant.toString()}; function _typeof(obj) { return typeof obj; }`
-      }
-    );
-    this.executeInFrame(
-      `(${injectDataStorage.toString()})()`
-    );
+    }
+
+    const frameDocument = this.frameDoc;
+    const body = this.frameBody;
+    if (!frameDocument || !body) {
+      return;
+    }
+
+    const moduleSource = typeof src === 'string' ? src.trim() : '';
+    const injectedModuleScript = frameDocument.getElementById('grapesjs-ckeditor-module-loader');
+    const hasInjectedModule = !!(moduleSource && injectedModuleScript && injectedModuleScript.getAttribute('src') === moduleSource);
+
+    if (!hasInjectedModule && moduleSource) {
+      createHtmlElem(
+        'script',
+        body,
+        {
+          id: 'grapesjs-ckeditor-module-loader',
+          src: moduleSource,
+        }
+      ).onload =
+        () => setTimeout(
+          () => {
+            [...frameDocument.querySelectorAll('style')].find(
+              item => {
+                let innerHTML = item.innerHTML;
+                let match = innerHTML.match(/.ck.ck-editor__editable_inline ?{[^}]*(overflow:[^;]*;)[^}]*}/);
+                if (match) {
+                  item.innerHTML = innerHTML.replace(match[0], '');
+                  createHtmlElem(
+                    'style',
+                    item.parentNode,
+                    {
+                      innerHTML: `.ck-toolbar {border-bottom-width: 1px !important;}` +
+                        `.ck.ck-editor__editable.ck-focused:not(.ck-editor__nested-editable) {border: none !important;box-shadow: none !important;} 
+                         .ck.ck-dropdown .ck-dropdown__panel.ck-dropdown__panel-visible { max-height: 200px; overflow-y: auto; } `
+                    }
+                  );
+                }
+                return match;
+              }
+            );
+          }
+        );
+    }
+
+    if (!frameDocument.getElementById('grapesjs-ckeditor-runtime')) {
+      createHtmlElem(
+        'script',
+        body,
+        {
+          id: 'grapesjs-ckeditor-runtime',
+          innerHTML: `${setElementProperty.toString()}; ${injectEditorInstant.toString()}; function _typeof(obj) { return typeof obj; }`
+        }
+      );
+    }
+
+    if (!this.frameContentWindow.grapesjsCkeditorData) {
+      this.executeInFrame(
+        `(${injectDataStorage.toString()})()`
+      );
+    }
+
     if (!this._Ck5ForGrapesJsData.frameScrollHandler) {
       this._Ck5ForGrapesJsData.frameScrollHandler = this.onResize.bind(this);
     }

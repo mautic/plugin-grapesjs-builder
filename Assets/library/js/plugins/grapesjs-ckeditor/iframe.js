@@ -1,6 +1,7 @@
 /**
  * Injects data storage object into window.
- */
+*/
+
 export function injectDataStorage() {
   window.grapesjsCkeditorData = {
     optionsRegistry: {}
@@ -57,6 +58,14 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
     delete registry[optionsKey];
   }
   const attachToolbarContainer = () => {
+    if (window.grapesjsCkeditorData.customFontSizeObserver) {
+      try {
+        window.grapesjsCkeditorData.customFontSizeObserver.disconnect();
+      } catch (err) {
+      }
+      window.grapesjsCkeditorData.customFontSizeObserver = null;
+    }
+
     if (window.grapesjsCkeditorData.toolbarContainer) {
       try {
         window.grapesjsCkeditorData.toolbarContainer.remove();
@@ -82,13 +91,17 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
       window.grapesjsCkeditorData.toolbarContainer,
       {}
     );
-    window.grapesjsCkeditorData.toolbarContainer.addEventListener(
-      'mousedown',
-      e => {
-        e.stopPropagation();
+
+    const stopToolbarEventPropagation = e => {
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === 'function') {
         e.stopImmediatePropagation();
       }
-    );
+    };
+
+    ['pointerdown', 'mousedown', 'mouseup', 'click', 'touchstart', 'touchend'].forEach(eventName => {
+      window.grapesjsCkeditorData.toolbarContainer.addEventListener(eventName, stopToolbarEventPropagation);
+    });
   };
 
   const ensureTipObserver = () => {
@@ -112,6 +125,211 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
   };
 
   const configureEditor = (editorInstance) => {
+    const setupFontSizeCustomInput = () => {
+      const toolbarRoot = editorInstance.ui && editorInstance.ui.view && editorInstance.ui.view.element
+        ? editorInstance.ui.view.element
+        : null;
+
+      if (!toolbarRoot) {
+        return;
+      }
+
+      const dropdown = toolbarRoot.querySelector('.ck-font-size-dropdown');
+      if (!dropdown) {
+        return;
+      }
+
+      const panel = dropdown.querySelector('.ck-dropdown__panel');
+      if (!panel) {
+        return;
+      }
+
+      if (panel.querySelector('.ck-font-size-custom-input-wrap')) {
+        return;
+      }
+
+      const list = panel.querySelector('.ck-list');
+      if (!list || !list.parentNode) {
+        return;
+      }
+
+      const wrap = document.createElement('div');
+      wrap.className = 'ck-font-size-custom-input-wrap';
+      wrap.style.padding = '6px';
+      wrap.style.borderBottom = '1px solid var(--ck-color-toolbar-border, #d9d9d9)';
+      wrap.style.background = 'var(--ck-color-toolbar-background, #fff)';
+
+      const controls = document.createElement('div');
+      controls.className = 'ck-font-size-custom-controls';
+      controls.style.display = 'block';
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '1';
+      input.step = '1';
+      input.placeholder = 'Custom size';
+      input.className = 'ck ck-input ck-font-size-custom-input';
+      input.style.width = '100%';
+
+      let savedSelectionRanges = [];
+
+      const captureSelectionRanges = () => {
+        try {
+          const modelSelection = editorInstance.model && editorInstance.model.document
+            ? editorInstance.model.document.selection
+            : null;
+
+          if (!modelSelection) {
+            savedSelectionRanges = [];
+            return;
+          }
+
+          savedSelectionRanges = Array.from(modelSelection.getRanges()).map(range => range.clone());
+        } catch (err) {
+          savedSelectionRanges = [];
+        }
+      };
+
+      const restoreSelectionRanges = () => {
+        if (!savedSelectionRanges.length) {
+          return;
+        }
+
+        try {
+          editorInstance.model.change(writer => {
+            writer.setSelection(savedSelectionRanges);
+          });
+        } catch (err) {
+        }
+      };
+
+      const applyFontSizeValue = () => {
+        const raw = typeof input.value === 'string' ? input.value.trim() : '';
+        if (!raw) {
+          return;
+        }
+
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+          return;
+        }
+
+        const normalized = Math.round(parsed * 100) / 100;
+        const normalizedString = `${normalized}`;
+        const normalizedWithUnit = `${normalizedString}px`;
+        const candidates = [
+          normalizedWithUnit,
+          normalizedString,
+          normalized
+        ];
+
+        restoreSelectionRanges();
+
+        let applied = false;
+
+        for (let index = 0; index < candidates.length; index += 1) {
+          const candidate = candidates[index];
+
+          try {
+            editorInstance.execute('fontSize', { value: candidate });
+            applied = true;
+            break;
+          } catch (err) {
+          }
+        }
+
+        if (!applied) {
+          try {
+            const fallbackValue = normalizedWithUnit;
+            editorInstance.model.change(writer => {
+              writer.removeSelectionAttribute('fontSize');
+              writer.setSelectionAttribute('fontSize', fallbackValue);
+            });
+            applied = true;
+          } catch (err) {
+            console.warn('GrapesJS CKEditor: unable to apply custom font size', err);
+            return;
+          }
+        }
+
+        try {
+          const editableRoot = editorInstance.ui && editorInstance.ui.view && editorInstance.ui.view.editable
+            ? editorInstance.ui.view.editable.element
+            : null;
+
+          if (editableRoot) {
+            const elementsWithStyle = editableRoot.querySelectorAll('[style]');
+            elementsWithStyle.forEach(element => {
+              const styleAttr = element.getAttribute('style');
+              if (typeof styleAttr !== 'string' || !styleAttr.includes('font-size')) {
+                return;
+              }
+
+              const normalizedStyle = styleAttr.replace(/font-size\s*:\s*(\d+(?:\.\d+)?)\s*;/gi, 'font-size:$1px;');
+              if (normalizedStyle !== styleAttr) {
+                element.setAttribute('style', normalizedStyle);
+              }
+            });
+          }
+        } catch (err) {
+        }
+      };
+
+      input.addEventListener('keydown', (event) => {
+        event.stopPropagation();
+
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          applyFontSizeValue();
+        }
+      });
+
+      input.addEventListener('mousedown', event => event.stopPropagation());
+      input.addEventListener('click', event => event.stopPropagation());
+      input.addEventListener('focus', captureSelectionRanges);
+      input.addEventListener('input', applyFontSizeValue);
+
+      const setCurrentSize = () => {
+        try {
+          const command = editorInstance.commands && editorInstance.commands.get
+            ? editorInstance.commands.get('fontSize')
+            : null;
+          const value = command ? command.value : null;
+
+          if (typeof value === 'number' && Number.isFinite(value)) {
+            input.value = `${value}`;
+            return;
+          }
+
+          if (typeof value === 'string') {
+            const normalized = value.trim().replace(/px$/i, '');
+            if (/^\d+(?:\.\d+)?$/.test(normalized)) {
+              input.value = normalized;
+              return;
+            }
+          }
+
+          input.value = '';
+        } catch (err) {
+          input.value = '';
+        }
+      };
+
+      const dropdownButton = dropdown.querySelector('.ck-dropdown__button');
+      if (dropdownButton) {
+        dropdownButton.addEventListener('click', () => {
+          setTimeout(() => {
+            captureSelectionRanges();
+            setCurrentSize();
+          }, 0);
+        });
+      }
+
+      controls.appendChild(input);
+      wrap.appendChild(controls);
+      list.parentNode.insertBefore(wrap, list);
+    };
+
     // Try to find CKEditor's toolbar element via the editor instance
     try {
       const rootEl = editorInstance.ui && editorInstance.ui.view && editorInstance.ui.view.element ? editorInstance.ui.view.element : null;
@@ -134,6 +352,15 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
     } catch (err) {
       console.warn('GrapesJS CKEditor: toolbar manipulation failed', err);
     }
+
+    setupFontSizeCustomInput();
+
+    const customFontSizeObserver = new MutationObserver(() => {
+      setupFontSizeCustomInput();
+    });
+
+    customFontSizeObserver.observe(document.body, { childList: true, subtree: true });
+    window.grapesjsCkeditorData.customFontSizeObserver = customFontSizeObserver;
 
     if (forceBr && !window.grapesjsCkeditorData.forceBrApplied) {
       try {
