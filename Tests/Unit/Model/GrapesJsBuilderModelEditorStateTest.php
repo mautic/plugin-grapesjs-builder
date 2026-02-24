@@ -164,11 +164,7 @@ final class GrapesJsBuilderModelEditorStateTest extends TestCase
             $this->createMock(CorePermissions::class),
             $this->createMock(EventDispatcherInterface::class),
             $this->createMock(Router::class),
-            new class extends Translator {
-                public function __construct()
-                {
-                }
-            },
+            $this->createMock(Translator::class),
             $this->createMock(UserHelper::class),
             $this->createMock(LoggerInterface::class),
             $this->createMock(CoreParametersHelper::class)

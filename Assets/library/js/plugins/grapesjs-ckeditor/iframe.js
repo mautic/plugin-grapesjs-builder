@@ -124,8 +124,7 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
     applyTipClass();
   };
 
-  const configureEditor = (editorInstance) => {
-    const setupFontSizeCustomInput = () => {
+  const setupFontSizeCustomInput = (editorInstance) => {
       const toolbarRoot = editorInstance.ui && editorInstance.ui.view && editorInstance.ui.view.element
         ? editorInstance.ui.view.element
         : null;
@@ -328,7 +327,9 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
       controls.appendChild(input);
       wrap.appendChild(controls);
       list.parentNode.insertBefore(wrap, list);
-    };
+  };
+
+  const configureEditor = (editorInstance) => {
 
     // Try to find CKEditor's toolbar element via the editor instance
     try {
@@ -353,10 +354,10 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
       console.warn('GrapesJS CKEditor: toolbar manipulation failed', err);
     }
 
-    setupFontSizeCustomInput();
+    setupFontSizeCustomInput(editorInstance);
 
     const customFontSizeObserver = new MutationObserver(() => {
-      setupFontSizeCustomInput();
+      setupFontSizeCustomInput(editorInstance);
     });
 
     customFontSizeObserver.observe(document.body, { childList: true, subtree: true });

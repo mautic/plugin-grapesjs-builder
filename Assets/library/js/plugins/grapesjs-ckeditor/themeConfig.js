@@ -273,29 +273,52 @@ export const themeConfigMixin = {
     }
 
     if (typeof option === 'string') {
-      const normalized = option.trim();
-      return normalized || null;
+      return this.normalizeOptionalString(option);
     }
 
     if (!option || typeof option !== 'object') {
       return null;
     }
 
+    return this.normalizeFontSizeObjectOption(option);
+  },
+
+  /**
+   * Normalizes optional string values by trimming and discarding empties.
+   *
+   * @param {string} value
+   * @returns {string|null}
+   */
+  normalizeOptionalString(value) {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const normalized = value.trim();
+    return normalized || null;
+  },
+
+  /**
+   * Normalizes object-based font size options.
+   *
+   * @param {Object} option
+   * @returns {Object|null}
+   */
+  normalizeFontSizeObjectOption(option) {
+    if (!option || typeof option !== 'object') {
+      return null;
+    }
+
     const normalized = { ...option };
 
-    if (typeof normalized.model === 'string') {
-      normalized.model = normalized.model.trim();
-    }
+    normalized.model = typeof normalized.model === 'string' ? this.normalizeOptionalString(normalized.model) : normalized.model;
+    normalized.title = typeof normalized.title === 'string' ? this.normalizeOptionalString(normalized.title) : normalized.title;
 
-    if (typeof normalized.title === 'string') {
-      normalized.title = normalized.title.trim();
-    }
-
-    if (normalized.model === '') {
+    if (normalized.model === '' || normalized.model === null) {
       delete normalized.model;
     }
 
-    if (normalized.title === '') {
+    if (normalized.title === '' || normalized.title === null) {
       delete normalized.title;
     }
 
@@ -755,8 +778,9 @@ export const themeConfigMixin = {
    * @returns {boolean}
    */
   classListEquals(listA, listB) {
-    const normalizedA = this.normalizeClassList(listA).sort();
-    const normalizedB = this.normalizeClassList(listB).sort();
+    const compareClassNames = (firstClassName, secondClassName) => firstClassName.localeCompare(secondClassName);
+    const normalizedA = this.normalizeClassList(listA).sort(compareClassNames);
+    const normalizedB = this.normalizeClassList(listB).sort(compareClassNames);
 
     if (normalizedA.length !== normalizedB.length) {
       return false;

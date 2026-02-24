@@ -1095,8 +1095,22 @@ export default class BuilderService {
     const noAssetsMessage = (translatedNoAssets && translatedNoAssets !== noAssetsTranslationKey)
       ? translatedNoAssets
       : 'No assets here, drop files to upload';
-    const normalizedNoAssetsMessage = noAssetsMessage
-      .replace(/<[^>]*>/g, ' ')
+    const stripHtml = value => {
+      if (typeof value !== 'string') {
+        return '';
+      }
+
+      if (typeof document === 'undefined') {
+        return value;
+      }
+
+      const container = document.createElement('div');
+      container.innerHTML = value;
+
+      return container.textContent || container.innerText || '';
+    };
+
+    const normalizedNoAssetsMessage = stripHtml(noAssetsMessage)
       .replace(/\s+/g, ' ')
       .trim();
 
