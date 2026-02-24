@@ -66,7 +66,7 @@ export const editorLifecycleMixin = {
 
     this.latestContent = el.innerHTML;
 
-    const selectedComponent = this.editor && typeof this.editor.getSelected === 'function'
+    const selectedComponent = typeof this.editor?.getSelected === 'function'
       ? this.editor.getSelected()
       : null;
     this.trackBadgableComponent(selectedComponent);
@@ -372,7 +372,7 @@ export const editorLifecycleMixin = {
     this.restoreToolbarVisibility();
 
     const canvas = this.editor?.Canvas;
-    const getToolbar = canvas && typeof canvas.getToolbarEl === 'function' ? () => canvas.getToolbarEl() : null;
+    const getToolbar = typeof canvas?.getToolbarEl === 'function' ? () => canvas.getToolbarEl() : null;
     if (!getToolbar) {
       this.toolbarVisibilityInfo = null;
       return;
@@ -425,7 +425,7 @@ export const editorLifecycleMixin = {
 
     const { toolbarEl, previousDisplay, previousVisibility, previousPointerEvents, listener } = this.toolbarVisibilityInfo;
 
-    if (listener && typeof this.editor.off === 'function') {
+    if (listener && typeof this.editor?.off === 'function') {
       try {
         this.editor.off('canvas:tools:update', listener);
       } catch (error) {
@@ -477,11 +477,11 @@ export const editorLifecycleMixin = {
    */
   getContentForInterface(el, rte) {
     if (rte && rte !== this) {
-      return el && typeof el.innerHTML === 'string' ? el.innerHTML : '';
+      return typeof el?.innerHTML === 'string' ? el.innerHTML : '';
     }
 
     if (!this.isActive) {
-      return el && typeof el.innerHTML === 'string' ? el.innerHTML : '';
+      return typeof el?.innerHTML === 'string' ? el.innerHTML : '';
     }
 
     return this.getContent();
@@ -574,8 +574,8 @@ export const editorLifecycleMixin = {
       this.inFrameData.toolbarContainer = null;
     }
 
-    toolbarContainer && toolbarContainer.remove();
-    this.inlineStyles && this.inlineStyles.remove();
+    toolbarContainer?.remove();
+    this.inlineStyles?.remove();
     this.inlineStyles = null;
     this._Ck5ForGrapesJsData.frameBodyEl = null;
     this._Ck5ForGrapesJsData.bodyWrapperEl = null;
@@ -583,7 +583,7 @@ export const editorLifecycleMixin = {
     this.el.style.display = this.display;
     this.el.contentEditable = false;
     this.el = null;
-    this.editorContainer && this.editorContainer.remove();
+    this.editorContainer?.remove();
     this.editorContainer = null;
     this.latestContent = null;
     this.display = undefined;
@@ -597,12 +597,12 @@ export const editorLifecycleMixin = {
     }
 
     const destroyEditorContext = () => {
-      if (ckeditor && ckeditor._context && typeof ckeditor._context.destroy === 'function') {
+      if (typeof ckeditor?._context?.destroy === 'function') {
         ckeditor._context.destroy();
       }
     };
 
-    if (ckeditor && typeof ckeditor.destroy === 'function') {
+    if (typeof ckeditor?.destroy === 'function') {
       Promise.resolve(ckeditor.destroy())
         .catch(error => {
           console.warn('GrapesJS CKEditor: unable to destroy editor', error);
@@ -643,7 +643,7 @@ export const editorLifecycleMixin = {
 
     const moduleSource = typeof src === 'string' ? src.trim() : '';
     const injectedModuleScript = frameDocument.getElementById('grapesjs-ckeditor-module-loader');
-    const hasInjectedModule = !!(moduleSource && injectedModuleScript && injectedModuleScript.getAttribute('src') === moduleSource);
+    const hasInjectedModule = !!(moduleSource && injectedModuleScript?.getAttribute('src') === moduleSource);
 
     if (!hasInjectedModule && moduleSource) {
       createHtmlElem(
@@ -656,25 +656,27 @@ export const editorLifecycleMixin = {
       ).onload =
         () => setTimeout(
           () => {
-            [...frameDocument.querySelectorAll('style')].find(
-              item => {
-                let innerHTML = item.innerHTML;
-                let match = innerHTML.match(/.ck.ck-editor__editable_inline ?{[^}]*(overflow:[^;]*;)[^}]*}/);
-                if (match) {
-                  item.innerHTML = innerHTML.replace(match[0], '');
-                  createHtmlElem(
-                    'style',
-                    item.parentNode,
-                    {
-                      innerHTML: `.ck-toolbar {border-bottom-width: 1px !important;}` +
-                        `.ck.ck-editor__editable.ck-focused:not(.ck-editor__nested-editable) {border: none !important;box-shadow: none !important;} 
-                         .ck.ck-dropdown .ck-dropdown__panel.ck-dropdown__panel-visible { max-height: 200px; overflow-y: auto; } `
-                    }
-                  );
-                }
-                return match;
+            const styles = [...frameDocument.querySelectorAll('style')];
+            for (let index = 0; index < styles.length; index += 1) {
+              const item = styles[index];
+              let innerHTML = item.innerHTML;
+              let match = innerHTML.match(/.ck.ck-editor__editable_inline ?{[^}]*(overflow:[^;]*;)[^}]*}/);
+              if (!match) {
+                continue;
               }
-            );
+
+              item.innerHTML = innerHTML.replace(match[0], '');
+              createHtmlElem(
+                'style',
+                item.parentNode,
+                {
+                  innerHTML: `.ck-toolbar {border-bottom-width: 1px !important;}` +
+                    `.ck.ck-editor__editable.ck-focused:not(.ck-editor__nested-editable) {border: none !important;box-shadow: none !important;} 
+                         .ck.ck-dropdown .ck-dropdown__panel.ck-dropdown__panel-visible { max-height: 200px; overflow-y: auto; } `
+                }
+              );
+              break;
+            }
           }
         );
     }
@@ -764,9 +766,9 @@ export const editorLifecycleMixin = {
    * @returns {string|null}
    */
   updateMenuWidthsBySelection(component) {
-    const targetComponent = component || (this.editor && typeof this.editor.getSelected === 'function' ? this.editor.getSelected() : null);
-    const element = targetComponent && typeof targetComponent.getEl === 'function' ? targetComponent.getEl() : null;
-    const width = element && typeof element.getBoundingClientRect === 'function' ? element.getBoundingClientRect().width : null;
+    const targetComponent = component || (typeof this.editor?.getSelected === 'function' ? this.editor.getSelected() : null);
+    const element = typeof targetComponent?.getEl === 'function' ? targetComponent.getEl() : null;
+    const width = typeof element?.getBoundingClientRect === 'function' ? element.getBoundingClientRect().width : null;
     if (!Number.isFinite(width) || width <= 0) {
       return null;
     }
@@ -811,7 +813,7 @@ export const editorLifecycleMixin = {
   },
 
   hasToolbarContainerContent() {
-    return !!(this.toolbarContainer && this.toolbarContainer.firstChild && this.toolbarContainer.firstChild.firstChild);
+    return !!this.toolbarContainer?.firstChild?.firstChild;
   },
 
   observeGjsToolbar(gjsToolbar) {
@@ -827,7 +829,7 @@ export const editorLifecycleMixin = {
   },
 
   getGjsToolbarRect(gjsToolbar) {
-    return (gjsToolbar && gjsToolbar.getBoundingClientRect()) || { width: 0, height: 0, bottom: 0 };
+    return gjsToolbar?.getBoundingClientRect() || { width: 0, height: 0, bottom: 0 };
   },
 
   shouldCenterToolbar(toolBarBoundingRect, elBoundingRect, gjsToolbarWidth) {

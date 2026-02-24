@@ -232,7 +232,7 @@ class Ck5ForGrapesJs {
       return null;
     }
 
-    if (this._Ck5ForGrapesJsData.themeConfigUrl && this._Ck5ForGrapesJsData.themeConfigUrlAlias === alias) {
+    if (this._Ck5ForGrapesJsData.themeConfigUrl?.length && this._Ck5ForGrapesJsData.themeConfigUrlAlias === alias) {
       return this._Ck5ForGrapesJsData.themeConfigUrl;
     }
 
@@ -308,7 +308,7 @@ class Ck5ForGrapesJs {
   }
 
   get toolbarContainer() {
-    return this.inFrameData && this.inFrameData.toolbarContainer;
+    return this.inFrameData?.toolbarContainer;
   }
 
   get licenseKey() {
@@ -324,19 +324,19 @@ class Ck5ForGrapesJs {
   }
 
   get frameContentWindow() {
-    return this.frame && this.frame.contentWindow;
+    return this.frame?.contentWindow;
   }
 
   get inFrameData() {
-    return this.frameContentWindow && this.frameContentWindow.grapesjsCkeditorData;
+    return this.frameContentWindow?.grapesjsCkeditorData;
   }
 
   get frameDoc() {
-    return this.frame && this.frame.contentDocument;
+    return this.frame?.contentDocument;
   }
 
   get frameBody() {
-    return this.frameDoc && this.frameDoc.body;
+    return this.frameDoc?.body;
   }
 
   get editor() {
@@ -348,7 +348,7 @@ class Ck5ForGrapesJs {
   }
 
   get ckeditor() {
-    return this.inFrameData && this.inFrameData.editor;
+    return this.inFrameData?.editor;
   }
 
   get isActive() {

@@ -28,6 +28,15 @@ export function setElementProperty(elem, properties) {
  * @param {boolean} forceBr
  */
 export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) {
+  const createHtmlElem = (type, container, properties) => {
+    const elem = document.createElement(type);
+    setElementProperty(elem, properties);
+    if (container) {
+      container.appendChild(elem);
+    }
+    return elem;
+  };
+
   const normalizeFeedItems = (items) => Array.from(items || []);
   const toMentionFeedPromise = (feed, queryText) => Promise.resolve(feed(queryText))
     .then(normalizeFeedItems)
@@ -52,7 +61,7 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
     });
   };
 
-  const registry = window.grapesjsCkeditorData && window.grapesjsCkeditorData.optionsRegistry;
+  const registry = window.grapesjsCkeditorData?.optionsRegistry;
   const options = registry && optionsKey ? registry[optionsKey] : {};
   if (registry && optionsKey) {
     delete registry[optionsKey];
@@ -125,7 +134,7 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
   };
 
   const setupFontSizeCustomInput = (editorInstance) => {
-      const toolbarRoot = editorInstance.ui && editorInstance.ui.view && editorInstance.ui.view.element
+      const toolbarRoot = editorInstance.ui?.view?.element
         ? editorInstance.ui.view.element
         : null;
 
@@ -174,7 +183,7 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
 
       const captureSelectionRanges = () => {
         try {
-          const modelSelection = editorInstance.model && editorInstance.model.document
+          const modelSelection = editorInstance.model?.document
             ? editorInstance.model.document.selection
             : null;
 
@@ -224,35 +233,29 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
 
         restoreSelectionRanges();
 
-        let applied = false;
-
         for (let index = 0; index < candidates.length; index += 1) {
           const candidate = candidates[index];
 
           try {
             editorInstance.execute('fontSize', { value: candidate });
-            applied = true;
-            break;
-          } catch (err) {
-          }
-        }
-
-        if (!applied) {
-          try {
-            const fallbackValue = normalizedWithUnit;
-            editorInstance.model.change(writer => {
-              writer.removeSelectionAttribute('fontSize');
-              writer.setSelectionAttribute('fontSize', fallbackValue);
-            });
-            applied = true;
-          } catch (err) {
-            console.warn('GrapesJS CKEditor: unable to apply custom font size', err);
             return;
+          } catch (err) {
           }
         }
 
         try {
-          const editableRoot = editorInstance.ui && editorInstance.ui.view && editorInstance.ui.view.editable
+          const fallbackValue = normalizedWithUnit;
+          editorInstance.model.change(writer => {
+            writer.removeSelectionAttribute('fontSize');
+            writer.setSelectionAttribute('fontSize', fallbackValue);
+          });
+        } catch (err) {
+          console.warn('GrapesJS CKEditor: unable to apply custom font size', err);
+          return;
+        }
+
+        try {
+          const editableRoot = editorInstance.ui?.view?.editable
             ? editorInstance.ui.view.editable.element
             : null;
 
@@ -290,7 +293,7 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
 
       const setCurrentSize = () => {
         try {
-          const command = editorInstance.commands && editorInstance.commands.get
+          const command = editorInstance.commands?.get
             ? editorInstance.commands.get('fontSize')
             : null;
           const value = command ? command.value : null;
@@ -333,7 +336,7 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
 
     // Try to find CKEditor's toolbar element via the editor instance
     try {
-      const rootEl = editorInstance.ui && editorInstance.ui.view && editorInstance.ui.view.element ? editorInstance.ui.view.element : null;
+      const rootEl = editorInstance.ui?.view?.element ? editorInstance.ui.view.element : null;
       const toolbarEl = rootEl ? rootEl.querySelector('.ck-toolbar') : null;
       if (toolbarEl) {
         // Hide toolbar initially
@@ -343,7 +346,7 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
         setTimeout(() => {
           try {
             // Prefer any API-backed toolbar element if available, fallback to DOM node
-            const tb = (editorInstance.ui && editorInstance.ui.view && editorInstance.ui.view.element && editorInstance.ui.view.element.querySelector('.ck-toolbar')) || toolbarEl;
+            const tb = editorInstance.ui?.view?.element?.querySelector('.ck-toolbar') || toolbarEl;
             if (tb) tb.style.display = '';
           } catch (err) {
             console.warn('GrapesJS CKEditor: unable to reveal toolbar', err);
@@ -420,22 +423,5 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
   }
 
   // Cross-frame iterable fix: Ensure mention feeds return a local array (iterable in this window)
-  normalizeMentionFeeds(options && options.mention ? options.mention : null);
-
-
-  /**
-   *
-   * @param {string} type
-   * @param {HTMLElement} container
-   * @param {Object} properties
-   * @return {HTMLElement}
-   */
-  function createHtmlElem(type, container, properties) {
-    const elem = document.createElement(type);
-    setElementProperty(elem, properties);
-    if (container) {
-      container.appendChild(elem);
-    }
-    return elem;
-  }
+  normalizeMentionFeeds(options?.mention || null);
 }
