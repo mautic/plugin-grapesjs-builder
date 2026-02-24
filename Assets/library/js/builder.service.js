@@ -123,7 +123,7 @@ export default class BuilderService {
       entityId,
       objectType,
       editorStateUrl: builderRouteContext ? builderRouteContext.editorStateUrl : null,
-      resetEditorState: !!(form && form.dataset && form.dataset.grapesjsbuilderReset === 'true'),
+      resetEditorState: form?.dataset?.grapesjsbuilderReset === 'true',
     };
   }
 
@@ -256,7 +256,7 @@ export default class BuilderService {
   }
 
   getOptimisticLockField() {
-    if (!this.context || !this.context.form || !this.context.formName) {
+    if (!this.context?.form || !this.context?.formName) {
       return null;
     }
 
@@ -265,7 +265,7 @@ export default class BuilderService {
 
   cacheOptimisticLockVersion() {
     const versionField = this.getOptimisticLockField()
-      || (this.context && this.context.formName
+      || (this.context?.formName
         ? document.getElementById(`${this.context.formName}_version`)
         : null);
     if (!versionField) {
@@ -280,10 +280,10 @@ export default class BuilderService {
 
   resolveOptimisticLockVersion() {
     const byName = this.getOptimisticLockField();
-    const byId = this.context && this.context.formName
+    const byId = this.context?.formName
       ? document.getElementById(`${this.context.formName}_version`)
       : null;
-    const fallbackInForm = this.context && this.context.form
+    const fallbackInForm = this.context?.form
       ? this.context.form.querySelector('input[name$="[version]"]')
       : null;
 
@@ -311,7 +311,7 @@ export default class BuilderService {
   }
 
   ensureOptimisticLockVersion() {
-    if (!this.context || !this.context.form || !this.context.formName) {
+    if (!this.context?.form || !this.context?.formName) {
       return;
     }
 
@@ -369,7 +369,7 @@ export default class BuilderService {
         this.setEditorStateFieldValue(serialized);
         this.pendingEditorState = editorState;
         this.editorStateLoaded = true;
-        if (this.context && this.context.form) {
+        if (this.context?.form) {
           this.context.form.dataset.grapesjsbuilderReset = 'false';
         }
         if (this.context) {
@@ -379,7 +379,7 @@ export default class BuilderService {
         this.setEditorStateFieldValue('');
         this.pendingEditorState = null;
         this.editorStateLoaded = false;
-        if (this.context && this.context.form) {
+        if (this.context?.form) {
           this.context.form.dataset.grapesjsbuilderReset = 'false';
         }
         if (this.context) {
@@ -502,7 +502,7 @@ export default class BuilderService {
       this.editor.trigger('hide');
     };
     
-    if (this.context && this.context.form) {
+    if (this.context?.form) {
       const $form = mQuery(this.context.form);
       $form
         .off('submit.grapesjsbuilder form-pre-serialize.grapesjsbuilder submit:success.grapesjsbuilder')
@@ -577,7 +577,7 @@ export default class BuilderService {
       }
     });
 
-    if (editorStatePrefetch && typeof editorStatePrefetch.then === 'function') {
+    if (typeof editorStatePrefetch?.then === 'function') {
       editorStatePrefetch.then((editorState) => {
         if (editorState && typeof editorState === 'object') {
           this.pendingEditorState = editorState;
@@ -665,7 +665,7 @@ export default class BuilderService {
     const attributes = {
       ...(existingOpenInNewTab.attributes || {}),
       target: '_blank',
-      rel: normalizeRel(existingOpenInNewTab.attributes && existingOpenInNewTab.attributes.rel),
+      rel: normalizeRel(existingOpenInNewTab.attributes?.rel),
     };
 
     const openInNewTabDecorator = {
@@ -710,7 +710,7 @@ export default class BuilderService {
     const inlineToolbar = ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'link', '|', 'removeFormat', '|', 'TokenPlugin', 'heading'];
 
     const options = baseOptions ? { ...baseOptions } : {};
-    const toolbarConfig = baseOptions && baseOptions.toolbar ? { ...baseOptions.toolbar } : {};
+    const toolbarConfig = baseOptions?.toolbar ? { ...baseOptions.toolbar } : {};
 
     toolbarConfig.items = inlineToolbar;
     toolbarConfig.shouldNotGroupWhenFull = true;
@@ -1235,7 +1235,7 @@ export default class BuilderService {
   }
 
   updateTypographySectorVisibility(target = null) {
-    const styleManager = this.editor && this.editor.StyleManager;
+    const styleManager = this.editor?.StyleManager;
     if (!styleManager || typeof styleManager.getSector !== 'function') {
       return;
     }
@@ -1297,7 +1297,7 @@ export default class BuilderService {
       }
     }
 
-    if (sector.view && sector.view.el) {
+    if (sector.view?.el) {
       return sector.view.el;
     }
 

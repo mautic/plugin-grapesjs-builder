@@ -142,7 +142,7 @@ export const editorLifecycleMixin = {
   },
 
   observeEditorElements(toolbarContainer) {
-    if (toolbarContainer && toolbarContainer.firstChild) {
+    if (toolbarContainer?.firstChild) {
       this.toolBarMObserver.observe(toolbarContainer.firstChild, {
         subtree: true,
         childList: true,
@@ -160,7 +160,7 @@ export const editorLifecycleMixin = {
   },
 
   getEditorEditableElement(ckeditor) {
-    if (ckeditor && ckeditor.ui && ckeditor.ui.view && ckeditor.ui.view.editable) {
+    if (ckeditor?.ui?.view?.editable) {
       return ckeditor.ui.view.editable.element;
     }
 
@@ -168,7 +168,7 @@ export const editorLifecycleMixin = {
   },
 
   getEditorToolbarElement(ckeditor) {
-    if (ckeditor && ckeditor.ui && ckeditor.ui.view) {
+    if (ckeditor?.ui?.view) {
       return ckeditor.ui.view.element;
     }
 
@@ -218,7 +218,7 @@ export const editorLifecycleMixin = {
       el.appendChild(editableEl);
     }
 
-    const toolbarWrapper = this.toolbarContainer && this.toolbarContainer.firstChild;
+    const toolbarWrapper = this.toolbarContainer?.firstChild;
     const toolbarEl = this.getEditorToolbarElement(ckeditor);
     if (toolbarWrapper && toolbarEl) {
       toolbarWrapper.appendChild(toolbarEl);
@@ -236,7 +236,7 @@ export const editorLifecycleMixin = {
       console.warn('GrapesJS CKEditor: unable to focus editor', error);
     }
 
-    const bodyWrapper = this.frameDoc && this.frameDoc.querySelector('.ck-body-wrapper');
+    const bodyWrapper = this.frameDoc?.querySelector('.ck-body-wrapper');
     if (bodyWrapper) {
       this.bindBodyWrapperListeners(bodyWrapper);
     }
@@ -371,7 +371,7 @@ export const editorLifecycleMixin = {
   trackToolbarVisibility() {
     this.restoreToolbarVisibility();
 
-    const canvas = this.editor && this.editor.Canvas;
+    const canvas = this.editor?.Canvas;
     const getToolbar = canvas && typeof canvas.getToolbarEl === 'function' ? () => canvas.getToolbarEl() : null;
     if (!getToolbar) {
       this.toolbarVisibilityInfo = null;
@@ -449,7 +449,7 @@ export const editorLifecycleMixin = {
    */
   getContent() {
     const ckeditor = this.ckeditor;
-    let ckeditorContent = ckeditor && ckeditor.data ? ckeditor.data.get() : '';
+    let ckeditorContent = ckeditor?.data ? ckeditor.data.get() : '';
     if (typeof ckeditorContent !== "string") ckeditorContent = "";
     const baseContent = this.resolveBaseContent(ckeditorContent);
 
@@ -553,7 +553,7 @@ export const editorLifecycleMixin = {
   },
 
   disconnectTipObserver(reuseEditor) {
-    if (reuseEditor || !this.inFrameData || !this.inFrameData.tipObserver) {
+    if (reuseEditor || !this.inFrameData?.tipObserver) {
       return;
     }
 

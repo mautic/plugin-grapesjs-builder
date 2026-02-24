@@ -9,7 +9,7 @@ export default class EditorStateService {
   }
 
   ensureEditorStateField(context) {
-    if (!context || !context.form) {
+    if (!context?.form) {
       return null;
     }
 
@@ -29,7 +29,7 @@ export default class EditorStateService {
   }
 
   safeParseEditorState(value) {
-    if (!value || !value.trim()) {
+    if (!value?.trim()) {
       return null;
     }
 
