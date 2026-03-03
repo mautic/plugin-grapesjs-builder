@@ -110,7 +110,6 @@ export const normalizationMixin = {
       anchor.style.setProperty('color', descriptor.value, descriptor.priority);
       anchor.style.setProperty('text-decoration-color', descriptor.value, descriptor.priority);
       anchor.style.setProperty('border-bottom-color', descriptor.value, descriptor.priority);
-      this.stripDescendantLinkColors(anchor);
     });
 
     return workingDocument.body.innerHTML;
@@ -264,7 +263,6 @@ export const normalizationMixin = {
         this.applyInlineStyle(anchor, 'color', value, priority);
         this.applyInlineStyle(anchor, 'text-decoration-color', value, priority);
         this.applyInlineStyle(anchor, 'border-bottom-color', value, priority);
-        this.stripDescendantLinkColors(anchor);
         managed.add(anchor);
         return;
       }

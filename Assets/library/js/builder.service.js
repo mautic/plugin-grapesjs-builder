@@ -235,6 +235,67 @@ export default class BuilderService {
     }
   }
 
+  syncOptimisticLockVersionFromResponse(response) {
+    if (!response || typeof response !== 'object' || typeof response.newContent !== 'string') {
+      return;
+    }
+
+    const selector = '#page_version, #emailform_version';
+    const updatedVersion = mQuery(response.newContent).find(selector).val();
+
+    if (typeof updatedVersion !== 'string') {
+      return;
+    }
+
+    const normalizedVersion = updatedVersion.trim();
+    if (!normalizedVersion) {
+      return;
+    }
+
+    const currentFormVersionField = this.getOptimisticLockField()
+      || (this.context?.formName ? document.getElementById(`${this.context.formName}_version`) : null);
+
+    if (currentFormVersionField) {
+      currentFormVersionField.value = normalizedVersion;
+    }
+
+    this.optimisticLockVersion = normalizedVersion;
+  }
+
+  patchApplyFormCommandForSubmitGuard() {
+    if (!this.editor?.Commands || typeof this.editor.Commands.get !== 'function') {
+      return;
+    }
+
+    const command = this.editor.Commands.get('preset-mautic:apply-form');
+    if (!command || typeof command.run !== 'function' || command.__gjsSubmitGuardPatched) {
+      return;
+    }
+
+    const originalRun = command.run.bind(command);
+
+    command.run = (...args) => {
+      if (typeof MauticVars !== 'undefined' && MauticVars.formSubmitInProgress) {
+        return;
+      }
+
+      if (typeof MauticVars !== 'undefined') {
+        MauticVars.formSubmitInProgress = true;
+      }
+
+      try {
+        return originalRun(...args);
+      } catch (error) {
+        if (typeof MauticVars !== 'undefined') {
+          MauticVars.formSubmitInProgress = false;
+        }
+        throw error;
+      }
+    };
+
+    command.__gjsSubmitGuardPatched = true;
+  }
+
   setEditorStateFieldValue(value) {
     if (!this.editorStateField) {
       return;
@@ -401,6 +462,8 @@ export default class BuilderService {
       throw Error('No editor found');
     }
 
+    this.patchApplyFormCommandForSubmitGuard();
+
     // Why would we not want to keep the history?
     //
     // this.editor.on('load', () => {
@@ -509,7 +572,9 @@ export default class BuilderService {
         .on('submit.grapesjsbuilder', () => this.persistEditorState())
         .on('form-pre-serialize.grapesjsbuilder', () => this.persistEditorState())
         .on('submit:success.grapesjsbuilder', (event, requestUrl, response) => {
+          this.syncOptimisticLockVersionFromResponse(response);
           this.syncContextAfterFirstSave(requestUrl, response);
+          this.cacheOptimisticLockVersion();
         });
     }
     this.editor.on('run:mautic-editor-page-html-close', triggerBuilderHide);

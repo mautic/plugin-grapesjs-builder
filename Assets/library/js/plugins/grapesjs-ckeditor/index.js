@@ -156,6 +156,7 @@ class Ck5ForGrapesJs {
             `.ck-button.token-tip-active { background-color: #fff9c4 !important; border: 1px solid #ffd54f !important; margin: 5px !important; padding: 5px 10px !important; cursor: default !important; pointer-events: none !important; width: calc(100% - 10px) !important; min-height: auto !important; display: block !important; box-shadow: none !important; } ` +
             `.ck-button.token-tip-active .ck-button__label { color: #333 !important; font-weight: normal !important; white-space: normal !important; text-align: left !important; font-size: 13px !important; } ` +
             `.ck-button.token-tip-active.ck-on, .ck-button.token-tip-active.ck-on:not(.ck-disabled):hover { background: #fff9c4 !important; border: 1px solid #ffd54f !important; box-shadow: none !important; } ` +
+            `a:visited { color: #551A8B !important; text-decoration-color: #551A8B !important; border-bottom-color: #551A8B !important; } ` +
             `li::marker { color: inherit; font-size: inherit; font-family: inherit; font-weight: inherit; } ` +
             `` +
             `ol { list-style-type: decimal !important; } ol ol { list-style-type: lower-alpha !important; } ol ol ol { list-style-type: lower-roman !important; }`

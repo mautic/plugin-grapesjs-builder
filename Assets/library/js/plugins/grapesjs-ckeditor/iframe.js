@@ -133,6 +133,26 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
     applyTipClass();
   };
 
+  const ensurePoweredByHidden = () => {
+    if (document.getElementById('gjs-cke-hide-powered-by-style')) {
+      return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'gjs-cke-hide-powered-by-style';
+    style.textContent = `
+      .ck.ck-powered-by,
+      .ck.ck-powered-by-balloon {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+    `;
+
+    document.head.appendChild(style);
+  };
+
   const setupFontSizeCustomInput = (editorInstance) => {
       const toolbarRoot = editorInstance.ui?.view?.element
         ? editorInstance.ui.view.element
@@ -333,6 +353,7 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
   };
 
   const configureEditor = (editorInstance) => {
+    ensurePoweredByHidden();
 
     // Try to find CKEditor's toolbar element via the editor instance
     try {
