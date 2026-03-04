@@ -236,18 +236,46 @@ export default class BuilderService {
   }
 
   syncOptimisticLockVersionFromResponse(response) {
-    if (!response || typeof response !== 'object' || typeof response.newContent !== 'string') {
+    if (!response || typeof response !== 'object') {
       return;
     }
 
-    const selector = '#page_version, #emailform_version';
-    const updatedVersion = mQuery(response.newContent).find(selector).val();
+    let normalizedVersion = null;
 
-    if (typeof updatedVersion !== 'string') {
-      return;
+    if (typeof response.newContent === 'string') {
+      const selectors = [
+        '#page_version',
+        '#emailform_version',
+        'input[name="page[version]"]',
+        'input[name="emailform[version]"]',
+      ];
+      const parsedResponseContent = mQuery(response.newContent);
+      let updatedVersion;
+
+      selectors.some((selector) => {
+        const candidateVersion = parsedResponseContent.find(selector).val();
+        if (typeof candidateVersion === 'undefined' || candidateVersion === null) {
+          return false;
+        }
+
+        updatedVersion = candidateVersion;
+        return true;
+      });
+
+      if (typeof updatedVersion === 'string' || typeof updatedVersion === 'number') {
+        normalizedVersion = `${updatedVersion}`.trim();
+      }
     }
 
-    const normalizedVersion = updatedVersion.trim();
+    if (!normalizedVersion && !response.validationError && typeof response.route === 'string') {
+      const currentVersion = this.resolveOptimisticLockVersion();
+      const currentVersionNumber = Number.parseInt(currentVersion, 10);
+
+      if (!Number.isNaN(currentVersionNumber) && currentVersionNumber > 0) {
+        normalizedVersion = `${currentVersionNumber + 1}`;
+      }
+    }
+
     if (!normalizedVersion) {
       return;
     }
@@ -335,7 +363,18 @@ export default class BuilderService {
 
     const rawValue = typeof versionField.value === 'string' ? versionField.value.trim() : `${versionField.value || ''}`.trim();
     if (rawValue) {
-      this.optimisticLockVersion = rawValue;
+      const cachedValue = typeof this.optimisticLockVersion === 'string'
+        ? this.optimisticLockVersion.trim()
+        : `${this.optimisticLockVersion || ''}`.trim();
+
+      const rawValueNumber = Number.parseInt(rawValue, 10);
+      const cachedValueNumber = Number.parseInt(cachedValue, 10);
+
+      if (!Number.isNaN(rawValueNumber) && !Number.isNaN(cachedValueNumber)) {
+        this.optimisticLockVersion = rawValueNumber >= cachedValueNumber ? rawValue : cachedValue;
+      } else {
+        this.optimisticLockVersion = rawValue;
+      }
     }
   }
 
@@ -398,7 +437,20 @@ export default class BuilderService {
       return;
     }
 
+    const cachedValue = typeof this.optimisticLockVersion === 'string'
+      ? this.optimisticLockVersion.trim()
+      : `${this.optimisticLockVersion || ''}`.trim();
+
     if (currentValue) {
+      const currentValueNumber = Number.parseInt(currentValue, 10);
+      const cachedValueNumber = Number.parseInt(cachedValue, 10);
+
+      if (!Number.isNaN(currentValueNumber) && !Number.isNaN(cachedValueNumber) && cachedValueNumber > currentValueNumber) {
+        versionField.value = cachedValue;
+        this.optimisticLockVersion = cachedValue;
+        return;
+      }
+
       this.optimisticLockVersion = currentValue;
     }
   }
