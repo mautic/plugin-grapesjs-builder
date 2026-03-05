@@ -241,8 +241,18 @@ export default class BuilderService {
     }
 
     let normalizedVersion = null;
+    const beforeSaveVersion = this.optimisticLockVersion || this.resolveOptimisticLockVersion();
+    const beforeSaveVersionNumber = Number.parseInt(beforeSaveVersion, 10);
+    const isSuccessfulEditResponse = !response.validationError
+      && typeof response.route === 'string'
+      && /\/(pages|emails)\/edit\/\d+(?:\/|$)/.test(response.route);
 
-    if (typeof response.newContent === 'string') {
+    const responseVersion = response.version ?? response.data?.version;
+    if (typeof responseVersion === 'string' || typeof responseVersion === 'number') {
+      normalizedVersion = `${responseVersion}`.trim();
+    }
+
+    if (!normalizedVersion && typeof response.newContent === 'string') {
       const selectors = [
         '#page_version',
         '#emailform_version',
@@ -267,13 +277,20 @@ export default class BuilderService {
       }
     }
 
-    if (!normalizedVersion && !response.validationError && typeof response.route === 'string') {
-      const currentVersion = this.resolveOptimisticLockVersion();
-      const currentVersionNumber = Number.parseInt(currentVersion, 10);
+    const normalizedVersionNumber = Number.parseInt(normalizedVersion, 10);
 
-      if (!Number.isNaN(currentVersionNumber) && currentVersionNumber > 0) {
-        normalizedVersion = `${currentVersionNumber + 1}`;
-      }
+    if (
+      normalizedVersion
+      && isSuccessfulEditResponse
+      && !Number.isNaN(beforeSaveVersionNumber)
+      && !Number.isNaN(normalizedVersionNumber)
+      && normalizedVersionNumber === beforeSaveVersionNumber
+    ) {
+      normalizedVersion = `${beforeSaveVersionNumber + 1}`;
+    }
+
+    if (!normalizedVersion && isSuccessfulEditResponse && !Number.isNaN(beforeSaveVersionNumber) && beforeSaveVersionNumber > 0) {
+      normalizedVersion = `${beforeSaveVersionNumber + 1}`;
     }
 
     if (!normalizedVersion) {
