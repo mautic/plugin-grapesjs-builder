@@ -753,12 +753,58 @@ export default class BuilderService {
     };
   }
 
+  static getCkEditorContentPolicy() {
+    const defaultPolicy = {
+      allowTables: true,
+      allowImages: false,
+      mapRightIndentToHanging: true,
+      // Preserve Word inline formatting (font-size, font-family, colors, etc.) in exported HTML.
+      stripWordInlineStyles: false,
+    };
+
+    const globalPolicy = (typeof window !== 'undefined' && window.MauticGrapesJsCkEditorContentPolicy && typeof window.MauticGrapesJsCkEditorContentPolicy === 'object')
+      ? window.MauticGrapesJsCkEditorContentPolicy
+      : {};
+
+    return {
+      ...defaultPolicy,
+      ...globalPolicy,
+    };
+  }
+
   static getCkeConf(tokenCallback) {
-    const blockToolbar = ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'alignment', 'outdent', 'indent', '|', 'bulletedList', 'numberedList', '|', 'link', '|', 'TokenPlugin', 'heading'];
+    const contentPolicy = BuilderService.getCkEditorContentPolicy();
+    const blockToolbar = ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'alignment', 'outdent', 'indent', '|', 'bulletedList', 'numberedList', '|', 'link'];
+
+    if (contentPolicy.allowTables !== false) {
+      blockToolbar.push('|', 'insertTable');
+    }
+
+    blockToolbar.push('|', 'TokenPlugin', 'heading');
 
     const blockConfig = Mautic.GetCkEditorConfigOptions(blockToolbar, tokenCallback) || {};
 
     blockConfig.licenseKey = 'GPL';
+    blockConfig.mauticContentPolicy = contentPolicy;
+
+    const fontFamilyConfig = blockConfig.fontFamily ? { ...blockConfig.fontFamily } : {};
+    fontFamilyConfig.supportAllValues = true;
+    blockConfig.fontFamily = fontFamilyConfig;
+
+    const htmlSupport = blockConfig.htmlSupport ? { ...blockConfig.htmlSupport } : {};
+    htmlSupport.allow = [
+      {
+        name: /.*/,
+        attributes: true,
+        classes: true,
+        styles: true,
+      },
+    ];
+    htmlSupport.fullPage = {
+      ...(htmlSupport.fullPage || {}),
+      allowRenderStylesFromHead: true,
+    };
+    blockConfig.htmlSupport = htmlSupport;
 
     if (blockConfig.toolbar) {
       blockConfig.toolbar = {
@@ -817,6 +863,37 @@ export default class BuilderService {
     linkConfig.decorators = decorators;
     blockConfig.link = linkConfig;
 
+    if (contentPolicy.allowTables !== false) {
+      const tableConfig = blockConfig.table ? { ...blockConfig.table } : {};
+      const existingToolbar = Array.isArray(tableConfig.contentToolbar) ? tableConfig.contentToolbar : [];
+      tableConfig.contentToolbar = existingToolbar.length
+        ? existingToolbar
+        : ['tableColumn', 'tableRow', 'mergeTableCells', 'tableCellProperties', 'tableProperties'];
+      blockConfig.table = tableConfig;
+    }
+
+    if (contentPolicy.allowImages === false) {
+      const imagePlugins = [
+        'AutoImage',
+        'Image',
+        'ImageBlock',
+        'ImageCaption',
+        'ImageInline',
+        'ImageInsert',
+        'ImageResize',
+        'ImageStyle',
+        'ImageToolbar',
+        'ImageUpload',
+        'Base64UploadAdapter',
+        'CKFinderUploadAdapter',
+        'CKFinder',
+        'EasyImage',
+      ];
+
+      const removePlugins = Array.isArray(blockConfig.removePlugins) ? [...blockConfig.removePlugins] : [];
+      blockConfig.removePlugins = Array.from(new Set([...removePlugins, ...imagePlugins]));
+    }
+
     if (blockConfig.dynamicToken) {
       blockConfig.dynamicToken = [
         {
@@ -841,7 +918,14 @@ export default class BuilderService {
   }
 
   static buildInlineCkeConf(baseOptions) {
-    const inlineToolbar = ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'link', '|', 'removeFormat', '|', 'TokenPlugin', 'heading'];
+    const contentPolicy = BuilderService.getCkEditorContentPolicy();
+    const inlineToolbar = ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'link'];
+
+    if (contentPolicy.allowTables !== false) {
+      inlineToolbar.push('|', 'insertTable');
+    }
+
+    inlineToolbar.push('|', 'removeFormat', '|', 'TokenPlugin', 'heading');
 
     const options = baseOptions ? { ...baseOptions } : {};
     const toolbarConfig = baseOptions?.toolbar ? { ...baseOptions.toolbar } : {};
@@ -849,6 +933,25 @@ export default class BuilderService {
     toolbarConfig.items = inlineToolbar;
     toolbarConfig.shouldNotGroupWhenFull = true;
     options.toolbar = toolbarConfig;
+
+    const fontFamilyConfig = options.fontFamily ? { ...options.fontFamily } : {};
+    fontFamilyConfig.supportAllValues = true;
+    options.fontFamily = fontFamilyConfig;
+
+    const htmlSupport = options.htmlSupport ? { ...options.htmlSupport } : {};
+    htmlSupport.allow = [
+      {
+        name: /.*/,
+        attributes: true,
+        classes: true,
+        styles: true,
+      },
+    ];
+    htmlSupport.fullPage = {
+      ...(htmlSupport.fullPage || {}),
+      allowRenderStylesFromHead: true,
+    };
+    options.htmlSupport = htmlSupport;
 
     if (options.dynamicToken) {
       options.dynamicToken = [
@@ -950,6 +1053,7 @@ export default class BuilderService {
           inline: inlineElements,
           inline_options: pageInlineOptions,
           options: pageCkEditorOptions,
+          content_policy: BuilderService.getCkEditorContentPolicy(),
           reuse_editor: false,
           toolbar_max_width: '445px',
           inline_toolbar_max_width: '360px',
@@ -1020,6 +1124,7 @@ export default class BuilderService {
           inline: inlineElements,
           inline_options: emailInlineOptions,
           options: emailCkEditorOptions,
+          content_policy: BuilderService.getCkEditorContentPolicy(),
           reuse_editor: false,
           toolbar_max_width: '445px',
           inline_toolbar_max_width: '360px',
@@ -1122,6 +1227,7 @@ export default class BuilderService {
           inline: inlineElements,
           inline_options: emailInlineOptions,
           options: emailCkEditorOptions,
+          content_policy: BuilderService.getCkEditorContentPolicy(),
           reuse_editor: false,
           toolbar_max_width: '445px',
           inline_toolbar_max_width: '360px',

@@ -122,7 +122,15 @@ export const normalizationMixin = {
    * @returns {string}
    */
   normalizeIndentationStyles(html) {
-    if (typeof html !== 'string' || (html.indexOf('margin-left') === -1 && html.indexOf('padding-left') === -1)) {
+    if (
+      typeof html !== 'string'
+      || (
+        html.indexOf('margin-left') === -1
+        && html.indexOf('padding-left') === -1
+        && html.indexOf('margin-right') === -1
+        && html.indexOf('padding-right') === -1
+      )
+    ) {
       return html;
     }
 
@@ -135,6 +143,29 @@ export const normalizationMixin = {
     workingDocument.body.innerHTML = html;
 
     this.applyIndentationNormalization(workingDocument.body);
+
+    return workingDocument.body.innerHTML;
+  },
+
+  /**
+   * Removes inline styles commonly added by Word from text-level blocks.
+   *
+   * @param {string} html
+   * @returns {string}
+   */
+  normalizeWordInlineStyles(html) {
+    if (typeof html !== 'string' || html.indexOf('style=') === -1) {
+      return html;
+    }
+
+    const implementation = (this.frameDoc && this.frameDoc.implementation) || (typeof document !== 'undefined' ? document.implementation : null);
+    if (!implementation || typeof implementation.createHTMLDocument !== 'function') {
+      return html;
+    }
+
+    const workingDocument = implementation.createHTMLDocument('');
+    workingDocument.body.innerHTML = html;
+    this.applyWordInlineStyleNormalization(workingDocument.body);
 
     return workingDocument.body.innerHTML;
   },
@@ -290,6 +321,9 @@ export const normalizationMixin = {
       return;
     }
 
+    const contentPolicy = this.contentPolicy || {};
+    const mapRightIndentToHanging = contentPolicy.mapRightIndentToHanging !== false;
+
     const properties = ['margin-left', 'padding-left', 'margin-right', 'padding-right', 'margin-inline-start', 'margin-inline-end', 'padding-inline-start', 'padding-inline-end'];
 
     // Move margins from blocks inside list items to the list item itself
@@ -313,12 +347,71 @@ export const normalizationMixin = {
     });
 
     root.querySelectorAll('[style]').forEach(element => {
+      if (mapRightIndentToHanging) {
+        this.convertRightIndentToHanging(element);
+      }
+
       properties.forEach(property => {
         const value = element.style.getPropertyValue(property);
         if (value && element.style.getPropertyPriority(property) !== 'important') {
           this.applyInlineStyle(element, property, value, 'important');
         }
       });
+    });
+  },
+
+  /**
+   * Converts right indentation styles into hanging indentation.
+   *
+   * @param {HTMLElement} element
+   */
+  convertRightIndentToHanging(element) {
+    if (!element || !element.style) {
+      return;
+    }
+
+    const hasHanging = !!element.style.getPropertyValue('text-indent');
+    if (hasHanging) {
+      return;
+    }
+
+    const marginRight = element.style.getPropertyValue('margin-right');
+    const paddingRight = element.style.getPropertyValue('padding-right');
+    const rightIndent = marginRight || paddingRight;
+    if (!rightIndent) {
+      return;
+    }
+
+    const marginRightPriority = element.style.getPropertyPriority('margin-right');
+    const paddingRightPriority = element.style.getPropertyPriority('padding-right');
+    const priority = marginRightPriority || paddingRightPriority || 'important';
+
+    if (!element.style.getPropertyValue('margin-left')) {
+      this.applyInlineStyle(element, 'margin-left', rightIndent, priority);
+    }
+
+    this.applyInlineStyle(element, 'text-indent', `-${rightIndent}`, priority);
+    element.style.removeProperty('margin-right');
+    element.style.removeProperty('padding-right');
+  },
+
+  /**
+   * Applies Word inline-style cleanup to configured text tags.
+   *
+   * @param {HTMLElement} root
+   */
+  applyWordInlineStyleNormalization(root) {
+    if (!root || typeof root.querySelectorAll !== 'function') {
+      return;
+    }
+
+    const contentPolicy = this.contentPolicy || {};
+    if (contentPolicy.stripWordInlineStyles === false) {
+      return;
+    }
+
+    root.querySelectorAll('p[style], span[style], h1[style], h2[style], h3[style], h4[style], h5[style], h6[style]').forEach(element => {
+      element.removeAttribute('style');
     });
   },
 

@@ -453,7 +453,13 @@ export const editorLifecycleMixin = {
     if (typeof ckeditorContent !== "string") ckeditorContent = "";
     const baseContent = this.resolveBaseContent(ckeditorContent);
 
-    return this.normalizeListMarkerStyles(this.normalizeIndentationStyles(this.normalizeLinkUnderlineColors(baseContent)));
+    return this.normalizeWordInlineStyles(
+      this.normalizeListMarkerStyles(
+        this.normalizeIndentationStyles(
+          this.normalizeLinkUnderlineColors(baseContent)
+        )
+      )
+    );
   },
 
   resolveBaseContent(ckeditorContent) {

@@ -49,7 +49,8 @@ class Ck5ForGrapesJs {
       inline_toolbar_max_width,
       parse_content = false,
       theme_alias,
-      reuse_editor
+      reuse_editor,
+      content_policy = {}
     } = opts;
     const resolvedInlineOptions = inline_options !== undefined ? inline_options : options;
 
@@ -86,6 +87,7 @@ class Ck5ForGrapesJs {
       badgableInfo: null,
       toolbarVisibilityInfo: null,
       parseContent: !!parse_content,
+      contentPolicy: typeof content_policy === 'object' && content_policy !== null ? content_policy : {},
       reuseEditor: reuse_editor !== undefined ? !!reuse_editor : false,
       fontConfigPromise: null,
       fontFamilyOptions: [],
@@ -270,6 +272,10 @@ class Ck5ForGrapesJs {
 
   get parseContent() {
     return this._Ck5ForGrapesJsData.parseContent;
+  }
+
+  get contentPolicy() {
+    return this._Ck5ForGrapesJsData.contentPolicy || {};
   }
 
   get inlineMode() {

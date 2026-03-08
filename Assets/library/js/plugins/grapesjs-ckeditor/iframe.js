@@ -353,6 +353,10 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
   };
 
   const configureEditor = (editorInstance) => {
+    const contentPolicy = options && typeof options.mauticContentPolicy === 'object'
+      ? options.mauticContentPolicy
+      : {};
+
     ensurePoweredByHidden();
 
     // Try to find CKEditor's toolbar element via the editor instance
@@ -404,13 +408,71 @@ export function injectEditorInstant(selector, optionsKey, forceBr, reuseEditor) 
       }
     }
 
+    if (contentPolicy.allowImages === false) {
+      let isRemovingDisallowedImages = false;
+
+      const removeDisallowedImages = () => {
+        if (isRemovingDisallowedImages) {
+          return;
+        }
+
+        const model = editorInstance.model;
+        if (!model || !model.document) {
+          return;
+        }
+
+        const removableElements = [];
+        for (const root of model.document.roots) {
+          for (const item of model.createRangeIn(root).getItems()) {
+            if (!item || typeof item.is !== 'function' || !item.is('element')) {
+              continue;
+            }
+
+            if (['image', 'imageBlock', 'imageInline'].includes(item.name)) {
+              removableElements.push(item);
+            }
+          }
+        }
+
+        if (!removableElements.length) {
+          return;
+        }
+
+        isRemovingDisallowedImages = true;
+        try {
+          model.change(writer => {
+            removableElements.forEach(element => {
+              if (element.root) {
+                writer.remove(element);
+              }
+            });
+          });
+        } finally {
+          isRemovingDisallowedImages = false;
+        }
+      };
+
+      editorInstance.model.document.on('change:data', removeDisallowedImages);
+      removeDisallowedImages();
+    }
+
     ensureTipObserver();
   };
 
   const createEditor = () => {
     attachToolbarContainer();
 
-    (window.CKEDITOR ? CKEDITOR.ClassicEditor : ClassicEditor).create(
+    const editorConstructor =
+      window.CKEDITOR?.ClassicEditor
+      || window.ClassicEditor
+      || (typeof ClassicEditor !== 'undefined' ? ClassicEditor : null);
+
+    if (!editorConstructor || typeof editorConstructor.create !== 'function') {
+      console.error('GrapesJS CKEditor: ClassicEditor constructor is not available in iframe context');
+      return;
+    }
+
+    editorConstructor.create(
       document.querySelector(selector),
       options
     ).then(
