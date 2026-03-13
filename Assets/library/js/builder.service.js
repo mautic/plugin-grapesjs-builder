@@ -866,9 +866,16 @@ export default class BuilderService {
     if (contentPolicy.allowTables !== false) {
       const tableConfig = blockConfig.table ? { ...blockConfig.table } : {};
       const existingToolbar = Array.isArray(tableConfig.contentToolbar) ? tableConfig.contentToolbar : [];
-      tableConfig.contentToolbar = existingToolbar.length
-        ? existingToolbar
-        : ['tableColumn', 'tableRow', 'mergeTableCells', 'tableCellProperties', 'tableProperties'];
+      const fullTableToolbar = [
+        'tableColumn',
+        'tableRow',
+        'mergeTableCells',
+        'toggleTableCaption',
+        'tableCellProperties',
+        'tableProperties',
+      ];
+
+      tableConfig.contentToolbar = Array.from(new Set([...existingToolbar, ...fullTableToolbar]));
       blockConfig.table = tableConfig;
     }
 
