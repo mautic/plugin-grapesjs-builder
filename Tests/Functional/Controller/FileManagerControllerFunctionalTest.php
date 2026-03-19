@@ -180,7 +180,6 @@ final class FileManagerControllerFunctionalTest extends MauticMysqlTestCase
     {
         $image = imagecreatetruecolor(100, 100);
         imagepng($image, $path);
-        imagedestroy($image);
     }
 
     private function createTempSvgFile(): UploadedFile
