@@ -12,11 +12,11 @@ import grapesjsstylebg from 'grapesjs-style-bg';
 import grapesjspostcss from 'grapesjs-parser-postcss';
 import grapesjsckeditor from './plugins/grapesjs-ckeditor';
 import grapesjsMjmlThemeTokens, { pluginId as mjmlThemeTokensPluginId } from './plugins/grapesjs-mjmlThemeTokens';
+import { extractMjHeadContent, createHeadInjectingMjmlParser } from './plugins/grapesjs-mjmlThemeTokens/utils';
 import contentService from 'grapesjs-preset-mautic/dist/content.service';
 import grapesjsmautic from 'grapesjs-preset-mautic';
 import editorFontsService from 'grapesjs-preset-mautic/dist/editorFonts/editorFonts.service';
 import StorageService from './storage.service';
-import mjml2html from 'mjml-browser';
 
 // for local dev
 // import contentService from '../../../../../../grapesjs-preset-mautic/src/content.service';
@@ -54,13 +54,6 @@ export default class BuilderService {
   optimisticLockVersion;
 
   /**
-   * Cached mj-head inner content from the theme/template.
-   * Used to inject theme tokens (mj-attributes, mj-class) into fragment compilation
-   * so styles are visible in the editor canvas.
-   */
-  cachedMjHeadContent = '';
-
-  /**
    * @param {AssetService} assetService
    */
   constructor(assetService) {
@@ -79,95 +72,6 @@ export default class BuilderService {
     this.optimisticLockVersion = null;
 
     this.patchMjmlService();
-  }
-
-  /**
-   * Extract mj-head inner content from MJML (without the tags).
-   * @param {string} mjml - Full MJML content
-   * @returns {string}
-   */
-  extractMjHeadContent(mjml) {
-    if (!mjml) return '';
-    const mjHeadMatch = mjml.match(/<mj-head[^>]*>([\s\S]*?)<\/mj-head>/i);
-    return mjHeadMatch && mjHeadMatch[1] ? mjHeadMatch[1].trim() : '';
-  }
-
-  /**
-   * Create an MJML parser wrapper that injects the cached <mj-head> into MJML fragments.
-   * This avoids patching every MJML component View.
-   *
-   * @param {() => string} getHeadContent
-   * @returns {(input: string|any, opts: any) => any}
-   */
-  createHeadInjectingMjmlParser(getHeadContent) {
-    return (input, opts) => {
-      // mjml-browser can accept MJML JSON too; only inject into string inputs
-      if (typeof input !== 'string') {
-        return mjml2html(input, opts);
-      }
-
-      const headContent = (getHeadContent && getHeadContent()) || '';
-      if (!headContent) {
-        return mjml2html(input, opts);
-      }
-
-      // Avoid double injecting if fragment already includes mj-head
-      if (/<mj-head[\s>]/i.test(input)) {
-        return mjml2html(input, opts);
-      }
-
-      // Inject right after the opening <mjml ...> tag
-      const withHead = input.replace(
-        /<mjml(\s[^>]*)?>/i,
-        (m) => `${m}<mj-head>${headContent}</mj-head>`
-      );
-
-      return mjml2html(withHead, opts);
-    };
-  }
-
-  /**
-   * Remove component "style-default" attributes when the component uses `mj-class`.
-   * This prevents GrapesJS-MJML default attributes (eg. mj-text font-size="13px",
-   * mj-button background-color="#414141", paddings, etc.) from overriding your theme
-   * tokens defined in `<mj-attributes>/<mj-class>`.
-   *
-   * It only strips attributes that exactly match the component's `style-default`,
-   * so user-provided overrides remain.
-   *
-   * @param {Editor} editor
-   */
-  stripDefaultAttrsForTokenizedComponents(editor) {
-    const wrapper = editor.getWrapper?.();
-    if (!wrapper) return;
-
-    const walk = (cmp) => {
-      const attrs = { ...(cmp.get('attributes') || {}) };
-      const mjClass = attrs['mj-class'];
-
-      if (mjClass) {
-        const styleDefault = cmp.get('style-default') || {};
-        let changed = false;
-
-        Object.keys(styleDefault).forEach((key) => {
-          if (key in attrs && attrs[key] === styleDefault[key]) {
-            delete attrs[key];
-            changed = true;
-          }
-        });
-
-        if (changed) {
-          cmp.set('attributes', attrs);
-        }
-      }
-
-      const children = cmp.components?.();
-      if (children && children.length) {
-        children.forEach((child) => walk(child));
-      }
-    };
-
-    wrapper.components?.().forEach((c) => walk(c));
   }
 
   patchMjmlService() {
@@ -1187,15 +1091,14 @@ export default class BuilderService {
     // validate
     MjmlService.mjmlToHtml(components);
 
-    // Cache mj-head inner content BEFORE init (used by mjmlParser wrapper)
-    this.cachedMjHeadContent = this.extractMjHeadContent(components);
+    const mjHeadContent = extractMjHeadContent(components);
 
     const styles = [
       `${mauticBaseUrl}plugins/GrapesJsBuilderBundle/Assets/library/js/grapesjs-editor.css`,
     ];
 
     // IMPORTANT: mjmlParser must be provided directly to grapesjs-mjml via pluginsOpts
-    const headInjectingParser = this.createHeadInjectingMjmlParser(() => this.cachedMjHeadContent);
+    const headInjectingParser = createHeadInjectingMjmlParser(mjHeadContent);
 
     const ckeditorModuleUrl = BuilderService.getCkeditorModuleUrl();
     const inlineElements = BuilderService.getInlineElements();
@@ -1237,7 +1140,7 @@ export default class BuilderService {
         },
 
         [grapesjsMjmlThemeTokens]: {
-          headContent: this.cachedMjHeadContent,
+          headContent: mjHeadContent,
         },
 
         grapesjsmautic: BuilderService.getMauticConf('email-mjml'),

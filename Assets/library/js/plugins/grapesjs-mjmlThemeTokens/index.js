@@ -1,3 +1,5 @@
+export { pluginId, extractMjHeadContent, createHeadInjectingMjmlParser } from './utils';
+
 export default (editor, opts = {}) => {
   const options = {
     // Provide mj-head inner content (preferred) or full original MJML
@@ -15,12 +17,6 @@ export default (editor, opts = {}) => {
     applyDefaultsToTypes: ['mj-text', 'mj-button', 'mj-section'],
 
     ...opts,
-  };
-
-  const extractMjHeadContent = (mjml) => {
-    if (!mjml) return '';
-    const m = mjml.match(/<mj-head[^>]*>([\s\S]*?)<\/mj-head>/i);
-    return m && m[1] ? m[1].trim() : '';
   };
 
   const headContent = options.headContent || extractMjHeadContent(options.originalMjml || '');
