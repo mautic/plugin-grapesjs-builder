@@ -1,4 +1,5 @@
 export { pluginId, extractMjHeadContent, createHeadInjectingMjmlParser } from './utils';
+import { patchBlocks, createBlockPatcher } from './blocks';
 
 export default (editor, opts = {}) => {
   const options = {
@@ -189,62 +190,29 @@ export default (editor, opts = {}) => {
     stripDefaultAttrsForComponent(component);
   };
 
-  const patchBlocks = () => {
-    const bm = editor.BlockManager;
-
-    const btnBlock = bm.get('mj-button');
-    if (btnBlock && classNames.size) {
-      const parts = (options.defaults.button || '').split(/\s+/).filter(Boolean);
-      if (parts.length && parts.every((p) => classNames.has(p))) {
-        btnBlock.set({
-          content: `<mj-button mj-class="${options.defaults.button}" href="https://">Button</mj-button>`,
-        });
-      }
-    }
-
-    const textBlock = bm.get('mj-text');
-    if (textBlock && classNames.size) {
-      if (classNames.has(options.defaults.text)) {
-        textBlock.set({
-          content: `<mj-text mj-class="${options.defaults.text}">Insert text here</mj-text>`,
-        });
-      }
-    }
-
-    const secondaryDefault = options.defaults.buttonSecondary || '';
-
-    // Register secondary button block if theme defines all required tokens and block doesn't exist yet
-    if (secondaryDefault && classNames.size && !bm.get('mj-button-secondary')) {
-      const secondaryParts = secondaryDefault.split(/\s+/).filter(Boolean);
-      if (secondaryParts.length && secondaryParts.every((p) => classNames.has(p))) {
-        bm.add('mj-button-secondary', {
-          label: Mautic.translate('grapesjsbuilder.secondaryButtonBlockLabel'),
-          category: Mautic.translate('grapesjsbuilder.categoryBlockLabel'),
-          content: `<mj-button mj-class="${secondaryDefault}" href="https://">Button</mj-button>`,
-          media: `<svg viewBox="0 0 24 24">
-            <path fill="currentColor" d="M20 20.5C20 21.3 19.3 22 18.5 22H13C12.6 22 12.3 21.9 12 21.6L8 17.4L8.7 16.6C8.9 16.4 9.2 16.3 9.5 16.3H9.7L12 18V9C12 8.4 12.4 8 13 8S14 8.4 14 9V13.5L15.2 13.6L19.1 15.8C19.6 16 20 16.6 20 17.1V20.5M20 2H4C2.9 2 2 2.9 2 4V12C2 13.1 2.9 14 4 14H8V12H4V4H20V12H18V14H20C21.1 14 22 13.1 22 12V4C22 2.9 21.1 2 20 2Z" />
-          </svg>`,
-        });
-      }
-    }
-  };
-
   // Must be executed during init (before setComponents) so mj-attributes content is hidden on parse
   registerHiddenMjAttributesTypes();
 
   editor.on('component:add', onComponentAdd);
 
+
+  const patchBlocksWithContext = createBlockPatcher({
+    editor,
+    options,
+    classNames,
+  });
+
   // Patch blocks when they appear (preset plugins may add them later)
-  editor.on('load', patchBlocks);
+  editor.on('load', patchBlocksWithContext);
   const blockColl = editor.BlockManager.getAll?.();
   if (blockColl?.on) {
-    blockColl.on('add reset', patchBlocks);
+    blockColl.on('add reset', patchBlocksWithContext);
   }
 
   // Service will call this after its setComponents + reparse workaround
   editor.on('mjml-theme-tokens:content:ready', () => {
     stripDefaultAttrsForTokenizedComponents();
-    patchBlocks();
+    patchBlocksWithContext();
     readyForNewDrops = true;
   });
 };
