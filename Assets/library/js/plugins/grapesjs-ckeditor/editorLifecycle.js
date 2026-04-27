@@ -623,7 +623,7 @@ export const editorLifecycleMixin = {
     let ckeditorContent = ckeditor?.data ? ckeditor.data.get() : '';
     if (typeof ckeditorContent !== "string") ckeditorContent = "";
     // Remove the placeholder injected in mountEditorUi() to preserve plain <span> elements.
-    ckeditorContent = ckeditorContent.replace(/\s*data-gjs-span="1"/gi, '');
+    ckeditorContent = ckeditorContent.replace(/ data-gjs-span="1"/g, '');
     const baseContent = this.resolveBaseContent(ckeditorContent);
 
     return this.normalizeWordInlineStyles(
