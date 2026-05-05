@@ -682,19 +682,6 @@ export const editorLifecycleMixin = {
     this.applyMissingDataSpansByOffsets(currentRoot, spanDescriptors);
   },
 
-  containsDataAttributeSpan(root) {
-    if (!root || typeof root.querySelectorAll !== 'function') {
-      return false;
-    }
-
-    return Array.from(root.querySelectorAll('span')).some(element => {
-      return Array.from(element.attributes || []).some(attribute => {
-        const name = `${attribute?.name || ''}`.toLowerCase();
-        return name.startsWith('data-');
-      });
-    });
-  },
-
   normalizeComparableText(value) {
     if (typeof value !== 'string') {
       return '';
@@ -704,7 +691,7 @@ export const editorLifecycleMixin = {
   },
 
   collectDataSpanDescriptors(root) {
-    if (!root || typeof Node !== 'function') {
+    if (!root || typeof Node === 'undefined') {
       return [];
     }
 
@@ -806,7 +793,7 @@ export const editorLifecycleMixin = {
   },
 
   resolveTextOffset(root, targetOffset) {
-    if (!root || typeof NodeFilter !== 'function') {
+    if (!root || typeof NodeFilter === 'undefined') {
       return null;
     }
 

@@ -1606,6 +1606,13 @@ export default class BuilderService {
       return;
     }
 
+    // Nested text components (e.g. <span> inside <p>) belong to their parent's
+    // editable rich text. Wrapping them in a block div would break inline flow,
+    // and re-tagging a child <p> would produce redundant nested <div>s.
+    if (this.hasTextComponentAncestor(component)) {
+      return;
+    }
+
     const tagName = `${component.get('tagName') || ''}`.toLowerCase();
     const headingTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
     const inlineHeadingTags = ['span'];
@@ -1629,6 +1636,25 @@ export default class BuilderService {
     }
 
     component.set('tagName', 'div');
+  }
+
+  hasTextComponentAncestor(component) {
+    if (!component || typeof component.parent !== 'function') {
+      return false;
+    }
+
+    let current = component.parent();
+    while (current && typeof current.get === 'function') {
+      if (current.get('type') === 'text') {
+        return true;
+      }
+      if (typeof current.parent !== 'function') {
+        return false;
+      }
+      current = current.parent();
+    }
+
+    return false;
   }
 
   normalizeTextComponentContainers(rootComponent = null) {
