@@ -772,9 +772,13 @@ export default class BuilderService {
     };
   }
 
+  static getBaseToolbarItems() {
+    return ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'alignment', 'outdent', 'indent', '|', 'bulletedList', 'numberedList', '|', 'link'];
+  }
+
   static getCkeConf(tokenCallback) {
     const contentPolicy = BuilderService.getCkEditorContentPolicy();
-    const blockToolbar = ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'alignment', 'outdent', 'indent', '|', 'bulletedList', 'numberedList', '|', 'link'];
+    const blockToolbar = BuilderService.getBaseToolbarItems();
 
     if (contentPolicy.allowTables !== false) {
       blockToolbar.push('|', 'insertTable');
@@ -926,7 +930,7 @@ export default class BuilderService {
 
   static buildInlineCkeConf(baseOptions) {
     const contentPolicy = BuilderService.getCkEditorContentPolicy();
-    const inlineToolbar = ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'link'];
+    const inlineToolbar = BuilderService.getBaseToolbarItems();
 
     if (contentPolicy.allowTables !== false) {
       inlineToolbar.push('|', 'insertTable');
@@ -1063,7 +1067,7 @@ export default class BuilderService {
           content_policy: BuilderService.getCkEditorContentPolicy(),
           reuse_editor: false,
           toolbar_max_width: '445px',
-          inline_toolbar_max_width: '360px',
+          inline_toolbar_max_width: '445px',
           theme_alias: BuilderService.getActiveThemeAlias(),
         },
         ...BuilderService.getPluginOptions('page'), // grapesjs-custom-plugins: add the plugin-options
@@ -1134,7 +1138,7 @@ export default class BuilderService {
           content_policy: BuilderService.getCkEditorContentPolicy(),
           reuse_editor: false,
           toolbar_max_width: '445px',
-          inline_toolbar_max_width: '360px',
+          inline_toolbar_max_width: '445px',
           theme_alias: BuilderService.getActiveThemeAlias(),
         },
         ...BuilderService.getPluginOptions('email-mjml'),
@@ -1237,7 +1241,7 @@ export default class BuilderService {
           content_policy: BuilderService.getCkEditorContentPolicy(),
           reuse_editor: false,
           toolbar_max_width: '445px',
-          inline_toolbar_max_width: '360px',
+          inline_toolbar_max_width: '445px',
           theme_alias: BuilderService.getActiveThemeAlias(),
         },
         ...BuilderService.getPluginOptions('email-html'),
