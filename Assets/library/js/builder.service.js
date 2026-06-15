@@ -62,7 +62,8 @@ export default class BuilderService {
     this.editorStateLoaded = false;
     this.editorStateService = new EditorStateService({
       setFieldValue: (value) => this.setEditorStateFieldValue(value),
-      setContextReset: (context, resetEditorState) => this.setContextEditorStateReset(context, resetEditorState),
+      setContextReset: (context, resetEditorState) =>
+        this.setContextEditorStateReset(context, resetEditorState),
     });
     this.typographySector = null;
     this.typographySectorInitialized = false;
@@ -109,9 +110,7 @@ export default class BuilderService {
     const objectType = builderRouteContext
       ? builderRouteContext.objectType
       : this.getDefaultObjectType(isPage);
-    const entityId = builderRouteContext
-      ? builderRouteContext.entityId
-      : fallbackEntityId;
+    const entityId = builderRouteContext ? builderRouteContext.entityId : fallbackEntityId;
     const sessionId = builderRouteContext
       ? builderRouteContext.objectId
       : this.normalizeSessionId(sessionValue);
@@ -141,9 +140,8 @@ export default class BuilderService {
 
   getBuilderRouteContext() {
     const builderUrlInput = document.getElementById('builder_url');
-    const builderUrlValue = builderUrlInput && typeof builderUrlInput.value === 'string'
-      ? builderUrlInput.value
-      : '';
+    const builderUrlValue =
+      builderUrlInput && typeof builderUrlInput.value === 'string' ? builderUrlInput.value : '';
 
     if (!builderUrlValue) {
       return null;
@@ -158,16 +156,17 @@ export default class BuilderService {
       return null;
     }
 
-    const routeMatch = parsedBuilderUrl.pathname.match(/\/grapesjsbuilder\/(page|email)\/([^/]+)\/?$/);
+    const routeMatch = parsedBuilderUrl.pathname.match(
+      /\/grapesjsbuilder\/(page|email)\/([^/]+)\/?$/
+    );
     if (!routeMatch) {
       return null;
     }
 
     const [, objectType, objectId] = routeMatch;
     const normalizedObjectId = decodeURIComponent(objectId);
-    const entityId = normalizedObjectId && !normalizedObjectId.startsWith('new')
-      ? normalizedObjectId
-      : null;
+    const entityId =
+      normalizedObjectId && !normalizedObjectId.startsWith('new') ? normalizedObjectId : null;
     const normalizedPathname = parsedBuilderUrl.pathname.replace(/\/$/, '');
 
     return {
@@ -180,15 +179,25 @@ export default class BuilderService {
 
   updateBuilderUrlForEntity(objectType, entityId) {
     const builderUrlInput = document.getElementById('builder_url');
-    if (!builderUrlInput || typeof builderUrlInput.value !== 'string' || !builderUrlInput.value.length) {
+    if (
+      !builderUrlInput ||
+      typeof builderUrlInput.value !== 'string' ||
+      !builderUrlInput.value.length
+    ) {
       return;
     }
 
     try {
       const parsedBuilderUrl = new URL(builderUrlInput.value, window.location.origin);
       const normalizedPathname = parsedBuilderUrl.pathname
-        .replace(/\/s\/(pages|emails)\/builder\/[^/]+\/?$/, `/s/grapesjsbuilder/${objectType}/${entityId}`)
-        .replace(/\/s\/grapesjsbuilder\/(page|email)\/[^/]+\/?$/, `/s/grapesjsbuilder/${objectType}/${entityId}`)
+        .replace(
+          /\/s\/(pages|emails)\/builder\/[^/]+\/?$/,
+          `/s/grapesjsbuilder/${objectType}/${entityId}`
+        )
+        .replace(
+          /\/s\/grapesjsbuilder\/(page|email)\/[^/]+\/?$/,
+          `/s/grapesjsbuilder/${objectType}/${entityId}`
+        )
         .replace(/\/$/, '');
 
       parsedBuilderUrl.pathname = normalizedPathname;
@@ -235,7 +244,9 @@ export default class BuilderService {
       }
 
       const refreshedRouteContext = this.getBuilderRouteContext();
-      this.context.editorStateUrl = refreshedRouteContext ? refreshedRouteContext.editorStateUrl : null;
+      this.context.editorStateUrl = refreshedRouteContext
+        ? refreshedRouteContext.editorStateUrl
+        : null;
     }
   }
 
@@ -247,9 +258,10 @@ export default class BuilderService {
     let normalizedVersion = null;
     const beforeSaveVersion = this.optimisticLockVersion || this.resolveOptimisticLockVersion();
     const beforeSaveVersionNumber = Number.parseInt(beforeSaveVersion, 10);
-    const isSuccessfulEditResponse = !response.validationError
-      && typeof response.route === 'string'
-      && /\/(pages|emails)\/edit\/\d+(?:\/|$)/.test(response.route);
+    const isSuccessfulEditResponse =
+      !response.validationError &&
+      typeof response.route === 'string' &&
+      /\/(pages|emails)\/edit\/\d+(?:\/|$)/.test(response.route);
 
     const responseVersion = response.version ?? response.data?.version;
     if (typeof responseVersion === 'string' || typeof responseVersion === 'number') {
@@ -284,16 +296,21 @@ export default class BuilderService {
     const normalizedVersionNumber = Number.parseInt(normalizedVersion, 10);
 
     if (
-      normalizedVersion
-      && isSuccessfulEditResponse
-      && !Number.isNaN(beforeSaveVersionNumber)
-      && !Number.isNaN(normalizedVersionNumber)
-      && normalizedVersionNumber === beforeSaveVersionNumber
+      normalizedVersion &&
+      isSuccessfulEditResponse &&
+      !Number.isNaN(beforeSaveVersionNumber) &&
+      !Number.isNaN(normalizedVersionNumber) &&
+      normalizedVersionNumber === beforeSaveVersionNumber
     ) {
       normalizedVersion = `${beforeSaveVersionNumber + 1}`;
     }
 
-    if (!normalizedVersion && isSuccessfulEditResponse && !Number.isNaN(beforeSaveVersionNumber) && beforeSaveVersionNumber > 0) {
+    if (
+      !normalizedVersion &&
+      isSuccessfulEditResponse &&
+      !Number.isNaN(beforeSaveVersionNumber) &&
+      beforeSaveVersionNumber > 0
+    ) {
       normalizedVersion = `${beforeSaveVersionNumber + 1}`;
     }
 
@@ -301,8 +318,9 @@ export default class BuilderService {
       return;
     }
 
-    const currentFormVersionField = this.getOptimisticLockField()
-      || (this.context?.formName ? document.getElementById(`${this.context.formName}_version`) : null);
+    const currentFormVersionField =
+      this.getOptimisticLockField() ||
+      (this.context?.formName ? document.getElementById(`${this.context.formName}_version`) : null);
 
     if (currentFormVersionField) {
       currentFormVersionField.value = normalizedVersion;
@@ -374,19 +392,22 @@ export default class BuilderService {
   }
 
   cacheOptimisticLockVersion() {
-    const versionField = this.getOptimisticLockField()
-      || (this.context?.formName
-        ? document.getElementById(`${this.context.formName}_version`)
-        : null);
+    const versionField =
+      this.getOptimisticLockField() ||
+      (this.context?.formName ? document.getElementById(`${this.context.formName}_version`) : null);
     if (!versionField) {
       return;
     }
 
-    const rawValue = typeof versionField.value === 'string' ? versionField.value.trim() : `${versionField.value || ''}`.trim();
+    const rawValue =
+      typeof versionField.value === 'string'
+        ? versionField.value.trim()
+        : `${versionField.value || ''}`.trim();
     if (rawValue) {
-      const cachedValue = typeof this.optimisticLockVersion === 'string'
-        ? this.optimisticLockVersion.trim()
-        : `${this.optimisticLockVersion || ''}`.trim();
+      const cachedValue =
+        typeof this.optimisticLockVersion === 'string'
+          ? this.optimisticLockVersion.trim()
+          : `${this.optimisticLockVersion || ''}`.trim();
 
       const rawValueNumber = Number.parseInt(rawValue, 10);
       const cachedValueNumber = Number.parseInt(cachedValue, 10);
@@ -415,9 +436,10 @@ export default class BuilderService {
         continue;
       }
 
-      const value = typeof candidate.value === 'string'
-        ? candidate.value.trim()
-        : `${candidate.value || ''}`.trim();
+      const value =
+        typeof candidate.value === 'string'
+          ? candidate.value.trim()
+          : `${candidate.value || ''}`.trim();
 
       if (value) {
         return value;
@@ -451,22 +473,30 @@ export default class BuilderService {
       return;
     }
 
-    const currentValue = typeof versionField.value === 'string' ? versionField.value.trim() : `${versionField.value || ''}`.trim();
+    const currentValue =
+      typeof versionField.value === 'string'
+        ? versionField.value.trim()
+        : `${versionField.value || ''}`.trim();
 
     if (!currentValue && resolvedVersion) {
       versionField.value = resolvedVersion;
       return;
     }
 
-    const cachedValue = typeof this.optimisticLockVersion === 'string'
-      ? this.optimisticLockVersion.trim()
-      : `${this.optimisticLockVersion || ''}`.trim();
+    const cachedValue =
+      typeof this.optimisticLockVersion === 'string'
+        ? this.optimisticLockVersion.trim()
+        : `${this.optimisticLockVersion || ''}`.trim();
 
     if (currentValue) {
       const currentValueNumber = Number.parseInt(currentValue, 10);
       const cachedValueNumber = Number.parseInt(cachedValue, 10);
 
-      if (!Number.isNaN(currentValueNumber) && !Number.isNaN(cachedValueNumber) && cachedValueNumber > currentValueNumber) {
+      if (
+        !Number.isNaN(currentValueNumber) &&
+        !Number.isNaN(cachedValueNumber) &&
+        cachedValueNumber > currentValueNumber
+      ) {
         versionField.value = cachedValue;
         this.optimisticLockVersion = cachedValue;
         return;
@@ -492,7 +522,11 @@ export default class BuilderService {
   persistEditorState() {
     this.ensureOptimisticLockVersion();
 
-    if (!this.editorStateField || !this.editor || typeof this.editor.getProjectData !== 'function') {
+    if (
+      !this.editorStateField ||
+      !this.editor ||
+      typeof this.editor.getProjectData !== 'function'
+    ) {
       return;
     }
 
@@ -637,11 +671,13 @@ export default class BuilderService {
       // trigger hide event on editor instance
       this.editor.trigger('hide');
     };
-    
+
     if (this.context?.form) {
       const $form = mQuery(this.context.form);
       $form
-        .off('submit.grapesjsbuilder form-pre-serialize.grapesjsbuilder submit:success.grapesjsbuilder')
+        .off(
+          'submit.grapesjsbuilder form-pre-serialize.grapesjsbuilder submit:success.grapesjsbuilder'
+        )
         .on('submit.grapesjsbuilder', () => this.persistEditorState())
         .on('form-pre-serialize.grapesjsbuilder', () => this.persistEditorState())
         .on('submit:success.grapesjsbuilder', (event, requestUrl, response) => {
@@ -657,7 +693,9 @@ export default class BuilderService {
 
     this.editor.on('load', () => this.setupTypographySectorVisibility());
     this.editor.on('load', () => this.normalizeTextComponentContainers());
-    this.editor.on('component:add', (component) => this.normalizeTextComponentContainers(component));
+    this.editor.on('component:add', (component) =>
+      this.normalizeTextComponentContainers(component)
+    );
     this.editor.on('rte:disable', (component) => this.normalizeTextComponentContainers(component));
     this.setupTypographySectorVisibility();
 
@@ -685,12 +723,16 @@ export default class BuilderService {
     if (window.MauticGrapesJsPlugins) {
       window.MauticGrapesJsPlugins.forEach((item) => {
         if (!item.name) {
-          console.warn('A name is required for Mautic-GrapesJs plugins in window.MauticGrapesJsPlugins. Registration skipped!');
+          console.warn(
+            'A name is required for Mautic-GrapesJs plugins in window.MauticGrapesJsPlugins. Registration skipped!'
+          );
           return;
         }
 
         if (typeof item.plugin !== 'function') {
-          console.warn('The Mautic-GrapesJs plugin must be a function in window.MauticGrapesJsPlugins. Registration skipped!');
+          console.warn(
+            'The Mautic-GrapesJs plugin must be a function in window.MauticGrapesJsPlugins. Registration skipped!'
+          );
           return;
         }
 
@@ -769,9 +811,12 @@ export default class BuilderService {
       stripWordInlineStyles: false,
     };
 
-    const globalPolicy = (typeof window !== 'undefined' && window.MauticGrapesJsCkEditorContentPolicy && typeof window.MauticGrapesJsCkEditorContentPolicy === 'object')
-      ? window.MauticGrapesJsCkEditorContentPolicy
-      : {};
+    const globalPolicy =
+      typeof window !== 'undefined' &&
+      window.MauticGrapesJsCkEditorContentPolicy &&
+      typeof window.MauticGrapesJsCkEditorContentPolicy === 'object'
+        ? window.MauticGrapesJsCkEditorContentPolicy
+        : {};
 
     return {
       ...defaultPolicy,
@@ -781,7 +826,29 @@ export default class BuilderService {
 
   static getCkeConf(tokenCallback) {
     const contentPolicy = BuilderService.getCkEditorContentPolicy();
-    const blockToolbar = ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'alignment', 'outdent', 'indent', '|', 'bulletedList', 'numberedList', '|', 'link'];
+    const blockToolbar = [
+      'undo',
+      'redo',
+      '|',
+      'bold',
+      'italic',
+      'underline',
+      'strikethrough',
+      '|',
+      'fontSize',
+      'fontFamily',
+      'fontColor',
+      'fontBackgroundColor',
+      '|',
+      'alignment',
+      'outdent',
+      'indent',
+      '|',
+      'bulletedList',
+      'numberedList',
+      '|',
+      'link',
+    ];
 
     if (contentPolicy.allowTables !== false) {
       blockToolbar.push('|', 'insertTable');
@@ -823,9 +890,10 @@ export default class BuilderService {
 
     const linkConfig = blockConfig.link ? { ...blockConfig.link } : {};
     const decorators = linkConfig.decorators ? { ...linkConfig.decorators } : {};
-    const existingOpenInNewTab = decorators.openInNewTab && typeof decorators.openInNewTab === 'object'
-      ? decorators.openInNewTab
-      : {};
+    const existingOpenInNewTab =
+      decorators.openInNewTab && typeof decorators.openInNewTab === 'object'
+        ? decorators.openInNewTab
+        : {};
 
     const normalizeRel = (value) => {
       const tokens = new Set();
@@ -845,10 +913,12 @@ export default class BuilderService {
       return Array.from(tokens).join(' ');
     };
 
-    const mode = typeof existingOpenInNewTab.mode === 'string' ? existingOpenInNewTab.mode : 'manual';
-    const label = typeof existingOpenInNewTab.label === 'string' && existingOpenInNewTab.label.trim()
-      ? existingOpenInNewTab.label
-      : 'Open in new tab';
+    const mode =
+      typeof existingOpenInNewTab.mode === 'string' ? existingOpenInNewTab.mode : 'manual';
+    const label =
+      typeof existingOpenInNewTab.label === 'string' && existingOpenInNewTab.label.trim()
+        ? existingOpenInNewTab.label
+        : 'Open in new tab';
     const attributes = {
       ...(existingOpenInNewTab.attributes || {}),
       target: '_blank',
@@ -872,7 +942,9 @@ export default class BuilderService {
 
     if (contentPolicy.allowTables !== false) {
       const tableConfig = blockConfig.table ? { ...blockConfig.table } : {};
-      const existingToolbar = Array.isArray(tableConfig.contentToolbar) ? tableConfig.contentToolbar : [];
+      const existingToolbar = Array.isArray(tableConfig.contentToolbar)
+        ? tableConfig.contentToolbar
+        : [];
       const fullTableToolbar = [
         'tableColumn',
         'tableRow',
@@ -904,7 +976,9 @@ export default class BuilderService {
         'EasyImage',
       ];
 
-      const removePlugins = Array.isArray(blockConfig.removePlugins) ? [...blockConfig.removePlugins] : [];
+      const removePlugins = Array.isArray(blockConfig.removePlugins)
+        ? [...blockConfig.removePlugins]
+        : [];
       blockConfig.removePlugins = Array.from(new Set([...removePlugins, ...imagePlugins]));
     }
 
@@ -912,9 +986,9 @@ export default class BuilderService {
       blockConfig.dynamicToken = [
         {
           id: 'token-tip',
-          name: "Tip: Type '{' directly in the editor to search for tokens!"
+          name: "Tip: Type '{' directly in the editor to search for tokens!",
         },
-        ...blockConfig.dynamicToken.filter(t => t.id !== 'token-tip')
+        ...blockConfig.dynamicToken.filter((t) => t.id !== 'token-tip'),
       ];
     }
 
@@ -928,12 +1002,44 @@ export default class BuilderService {
   }
 
   static getInlineElements() {
-    return ['div', 'span', 'a', 'button', 'label', 'strong', 'em', 'small', 'sup', 'sub', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+    return [
+      'div',
+      'span',
+      'a',
+      'button',
+      'label',
+      'strong',
+      'em',
+      'small',
+      'sup',
+      'sub',
+      'h1',
+      'h2',
+      'h3',
+      'h4',
+      'h5',
+      'h6',
+    ];
   }
 
   static buildInlineCkeConf(baseOptions) {
     const contentPolicy = BuilderService.getCkEditorContentPolicy();
-    const inlineToolbar = ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'link'];
+    const inlineToolbar = [
+      'undo',
+      'redo',
+      '|',
+      'bold',
+      'italic',
+      'underline',
+      'strikethrough',
+      '|',
+      'fontSize',
+      'fontFamily',
+      'fontColor',
+      'fontBackgroundColor',
+      '|',
+      'link',
+    ];
 
     if (contentPolicy.allowTables !== false) {
       inlineToolbar.push('|', 'insertTable');
@@ -971,9 +1077,9 @@ export default class BuilderService {
       options.dynamicToken = [
         {
           id: 'token-tip',
-          name: "Tip: Type '{' directly in the editor to search for tokens!"
+          name: "Tip: Type '{' directly in the editor to search for tokens!",
         },
-        ...options.dynamicToken.filter(t => t.id !== 'token-tip')
+        ...options.dynamicToken.filter((t) => t.id !== 'token-tip'),
       ];
     }
 
@@ -1030,7 +1136,7 @@ export default class BuilderService {
       canvas: {
         styles: [
           ...contentService.getStyles(),
-          `${mauticBaseUrl}plugins/GrapesJsBuilderBundle/Assets/library/js/grapesjs-editor.css`
+          `${mauticBaseUrl}plugins/GrapesJsBuilderBundle/Assets/library/js/grapesjs-editor.css`,
         ],
       },
       storageManager: false, // https://grapesjs.com/docs/modules/Storage.html#basic-configuration
@@ -1098,7 +1204,7 @@ export default class BuilderService {
     MjmlService.mjmlToHtml(components);
 
     const styles = [
-      `${mauticBaseUrl}plugins/GrapesJsBuilderBundle/Assets/library/js/grapesjs-editor.css`
+      `${mauticBaseUrl}plugins/GrapesJsBuilderBundle/Assets/library/js/grapesjs-editor.css`,
     ];
 
     const ckeditorModuleUrl = BuilderService.getCkeditorModuleUrl();
@@ -1124,7 +1230,13 @@ export default class BuilderService {
       },
       storageManager: false,
       assetManager: this.getAssetManagerConf(),
-      plugins: [grapesjsmjml, grapesjspostcss, grapesjsmautic, grapesjsckeditor, ...BuilderService.getPluginNames('email-mjml')],
+      plugins: [
+        grapesjsmjml,
+        grapesjspostcss,
+        grapesjsmautic,
+        grapesjsckeditor,
+        ...BuilderService.getPluginNames('email-mjml'),
+      ],
       pluginsOpts: {
         [grapesjsmjml]: {
           hideSelector: false,
@@ -1179,7 +1291,7 @@ export default class BuilderService {
             return { type: 'text' };
           }
           return originalIsComponent ? originalIsComponent(el) : undefined;
-        }
+        },
       });
     };
   }
@@ -1194,7 +1306,7 @@ export default class BuilderService {
       editor.DomComponents.addType(component, {
         model: {
           defaults: {
-            void: false
+            void: false,
           },
           toHTML() {
             const tag = this.get('tagName');
@@ -1212,11 +1324,11 @@ export default class BuilderService {
 
             // Add the components after the closing tag
             const componentsHtml = this.get('components')
-              .map(model => model.toHTML())
+              .map((model) => model.toHTML())
               .join('');
             return html + componentsHtml;
           },
-        }
+        },
       });
     });
   }
@@ -1228,7 +1340,7 @@ export default class BuilderService {
     }
 
     const styles = [
-      `${mauticBaseUrl}plugins/GrapesJsBuilderBundle/Assets/library/js/grapesjs-editor.css`
+      `${mauticBaseUrl}plugins/GrapesJsBuilderBundle/Assets/library/js/grapesjs-editor.css`,
     ];
 
     const ckeditorModuleUrl = BuilderService.getCkeditorModuleUrl();
@@ -1247,7 +1359,13 @@ export default class BuilderService {
       },
       storageManager: false,
       assetManager: this.getAssetManagerConf(),
-      plugins: [grapesjsnewsletter, grapesjspostcss, grapesjsmautic, grapesjsckeditor, ...BuilderService.getPluginNames('email-html')],
+      plugins: [
+        grapesjsnewsletter,
+        grapesjspostcss,
+        grapesjsmautic,
+        grapesjsckeditor,
+        ...BuilderService.getPluginNames('email-html'),
+      ],
       pluginsOpts: {
         grapesjsnewsletter: {
           useCustomTheme: false,
@@ -1300,7 +1418,7 @@ export default class BuilderService {
               if (pluginContext === context) {
                 plugins.push(item.name);
               }
-            })
+            });
           }
         }
       });
@@ -1328,7 +1446,7 @@ export default class BuilderService {
             if (pluginContext === context) {
               pluginOptions[item.name] = item.pluginOptions ?? {};
             }
-          })
+          });
         }
       });
     }
@@ -1364,10 +1482,11 @@ export default class BuilderService {
   getAssetManagerConf() {
     const noAssetsTranslationKey = 'grapesjsbuilder.assetManager.noAssets';
     const translatedNoAssets = Mautic.translate(noAssetsTranslationKey);
-    const noAssetsMessage = (translatedNoAssets && translatedNoAssets !== noAssetsTranslationKey)
-      ? translatedNoAssets
-      : 'No assets here, drop files to upload';
-    const stripHtml = value => {
+    const noAssetsMessage =
+      translatedNoAssets && translatedNoAssets !== noAssetsTranslationKey
+        ? translatedNoAssets
+        : 'No assets here, drop files to upload';
+    const stripHtml = (value) => {
       if (typeof value !== 'string') {
         return '';
       }
@@ -1382,9 +1501,7 @@ export default class BuilderService {
       return container.textContent || container.innerText || '';
     };
 
-    const normalizedNoAssetsMessage = stripHtml(noAssetsMessage)
-      .replace(/\s+/g, ' ')
-      .trim();
+    const normalizedNoAssetsMessage = stripHtml(noAssetsMessage).replace(/\s+/g, ' ').trim();
 
     return {
       assets: [],
@@ -1408,26 +1525,25 @@ export default class BuilderService {
    */
   moveBlocksPage() {
     const blocks = this.editor.BlockManager.getAll();
-    blocks.map(block => {
+    blocks.map((block) => {
       // columns go into a new category, at the top
       if (block.attributes.id.indexOf('column') !== -1) {
         this.editor.BlockManager.get(block.attributes.id).set('category', {
-          label: "Sections",
-          order: -1
+          label: 'Sections',
+          order: -1,
         });
       }
       // 'Blocks' category goes after 'Basic'
       if (block.attributes.category === 'Basic') {
         this.editor.BlockManager.get(block.attributes.id).set('category', {
-          label: "Basic",
-          order: -1
+          label: 'Basic',
+          order: -1,
         });
       }
     });
   }
 
   removeSelectedElementsEmailMjml() {
-
     // Remove the RAW block (it's just not usable)
     const rawblock = this.editor.BlockManager.get('mj-raw');
 
@@ -1453,13 +1569,18 @@ export default class BuilderService {
 
     this.typographySector = sector;
     // Delay updates slightly so GrapesJS finishes its own selection bookkeeping before we toggle the sector.
-    const scheduleUpdate = (target, delay) => this.scheduleTypographySectorVisibilityUpdate(target, delay);
+    const scheduleUpdate = (target, delay) =>
+      this.scheduleTypographySectorVisibilityUpdate(target, delay);
     const selectionDelay = 15;
 
     this.editor.on('component:selected', (component) => scheduleUpdate(component, selectionDelay));
-    this.editor.on('component:deselected', () => this.scheduleTypographySectorVisibilityUpdate(null, selectionDelay));
+    this.editor.on('component:deselected', () =>
+      this.scheduleTypographySectorVisibilityUpdate(null, selectionDelay)
+    );
     this.editor.on('rte:enable', (component) => scheduleUpdate(component, selectionDelay));
-    this.editor.on('rte:disable', () => this.scheduleTypographySectorVisibilityUpdate(null, selectionDelay));
+    this.editor.on('rte:disable', () =>
+      this.scheduleTypographySectorVisibilityUpdate(null, selectionDelay)
+    );
 
     this.typographySectorInitialized = true;
     this.scheduleTypographySectorVisibilityUpdate(null, selectionDelay);
@@ -1558,9 +1679,10 @@ export default class BuilderService {
 
   resolveTypographySectorElement(sector) {
     const sectorId = typeof sector.getId === 'function' ? sector.getId() : 'typography';
-    const editorContainer = this.editor && typeof this.editor.getContainer === 'function'
-      ? this.editor.getContainer()
-      : null;
+    const editorContainer =
+      this.editor && typeof this.editor.getContainer === 'function'
+        ? this.editor.getContainer()
+        : null;
 
     if (editorContainer) {
       const sectorEl = editorContainer.querySelector(`.gjs-sm-sector[id*="${sectorId}"]`);
@@ -1613,6 +1735,13 @@ export default class BuilderService {
       return;
     }
 
+    // Elements inside list items keep their original tag. Re-tagging a <p> to
+    // <div> or wrapping a heading/span in a block div breaks the bullet/number
+    // layout and the indentation pasted from Word lists.
+    if (this.isInsideListItem(component)) {
+      return;
+    }
+
     const tagName = `${component.get('tagName') || ''}`.toLowerCase();
     const headingTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
     const inlineHeadingTags = ['span'];
@@ -1657,6 +1786,27 @@ export default class BuilderService {
     return false;
   }
 
+  isInsideListItem(component) {
+    if (!component || typeof component.parent !== 'function') {
+      return false;
+    }
+
+    const listTags = ['li', 'ul', 'ol'];
+    let current = component.parent();
+    while (current && typeof current.get === 'function') {
+      const parentTag = `${current.get('tagName') || ''}`.toLowerCase();
+      if (listTags.includes(parentTag)) {
+        return true;
+      }
+      if (typeof current.parent !== 'function') {
+        return false;
+      }
+      current = current.parent();
+    }
+
+    return false;
+  }
+
   normalizeTextComponentContainers(rootComponent = null) {
     if (!this.editor || typeof this.editor.getWrapper !== 'function') {
       return;
@@ -1687,27 +1837,32 @@ export default class BuilderService {
       return;
     }
 
-    const index = typeof component.index === 'function'
-      ? component.index()
-      : parent.components().indexOf(component);
+    const index =
+      typeof component.index === 'function'
+        ? component.index()
+        : parent.components().indexOf(component);
 
-    const createdWrapper = parent.components().add({
-      type: 'text',
-      tagName: 'div',
-      classes: ['gjs-heading-wrapper', `gjs-heading-wrapper-${headingTag}`],
-    }, {
-      at: index,
-      action: 'component:wrap-heading',
-    });
+    const createdWrapper = parent.components().add(
+      {
+        type: 'text',
+        tagName: 'div',
+        classes: ['gjs-heading-wrapper', `gjs-heading-wrapper-${headingTag}`],
+      },
+      {
+        at: index,
+        action: 'component:wrap-heading',
+      }
+    );
 
     const wrapper = Array.isArray(createdWrapper) ? createdWrapper[0] : createdWrapper;
     if (!wrapper || typeof wrapper.append !== 'function') {
       return;
     }
 
-    const isSelected = this.editor
-      && typeof this.editor.getSelected === 'function'
-      && this.editor.getSelected() === component;
+    const isSelected =
+      this.editor &&
+      typeof this.editor.getSelected === 'function' &&
+      this.editor.getSelected() === component;
 
     wrapper.append(component, { action: 'component:wrap-heading' });
 
@@ -1731,8 +1886,10 @@ export default class BuilderService {
       return false;
     }
 
-    return classes.includes('gjs-heading-wrapper')
-      && classes.includes(`gjs-heading-wrapper-${headingTag}`);
+    return (
+      classes.includes('gjs-heading-wrapper') &&
+      classes.includes(`gjs-heading-wrapper-${headingTag}`)
+    );
   }
 
   isDataSlotTextContainer(component) {
@@ -1745,9 +1902,10 @@ export default class BuilderService {
       return false;
     }
 
-    const attributes = typeof component.getAttributes === 'function'
-      ? component.getAttributes()
-      : (component.get('attributes') || {});
+    const attributes =
+      typeof component.getAttributes === 'function'
+        ? component.getAttributes()
+        : component.get('attributes') || {};
 
     return attributes['data-slot'] === 'text';
   }
@@ -1774,9 +1932,7 @@ export default class BuilderService {
 
     visitor(component);
 
-    const children = typeof component.components === 'function'
-      ? component.components()
-      : null;
+    const children = typeof component.components === 'function' ? component.components() : null;
 
     if (!children || typeof children.forEach !== 'function') {
       return;
