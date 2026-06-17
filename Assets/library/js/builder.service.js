@@ -814,7 +814,29 @@ export default class BuilderService {
   }
 
   static getBaseToolbarItems() {
-    return ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'alignment', 'outdent', 'indent', '|', 'bulletedList', 'numberedList', '|', 'link'];
+    return [
+      'undo',
+      'redo',
+      '|',
+      'bold',
+      'italic',
+      'underline',
+      'strikethrough',
+      '|',
+      'fontSize',
+      'fontFamily',
+      'fontColor',
+      'fontBackgroundColor',
+      '|',
+      'alignment',
+      'outdent',
+      'indent',
+      '|',
+      'bulletedList',
+      'numberedList',
+      '|',
+      'link',
+    ];
   }
 
   static getCkeConf(tokenCallback) {
