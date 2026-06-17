@@ -43,12 +43,6 @@ export default class BuilderService {
 
   editorStateService;
 
-  typographySector;
-
-  typographySectorInitialized;
-
-  typographySectorTimeout;
-
   optimisticLockVersion;
 
   /**
@@ -65,9 +59,6 @@ export default class BuilderService {
       setContextReset: (context, resetEditorState) =>
         this.setContextEditorStateReset(context, resetEditorState),
     });
-    this.typographySector = null;
-    this.typographySectorInitialized = false;
-    this.typographySectorTimeout = null;
     this.optimisticLockVersion = null;
 
     this.patchMjmlService();
@@ -691,13 +682,11 @@ export default class BuilderService {
     this.editor.on('run:mautic-editor-email-mjml-close', triggerBuilderHide);
     this.editor.on('run:preset-mautic:apply-form', () => this.persistEditorState());
 
-    this.editor.on('load', () => this.setupTypographySectorVisibility());
     this.editor.on('load', () => this.normalizeTextComponentContainers());
     this.editor.on('component:add', (component) =>
       this.normalizeTextComponentContainers(component)
     );
     this.editor.on('rte:disable', (component) => this.normalizeTextComponentContainers(component));
-    this.setupTypographySectorVisibility();
 
     // add offset to flashes container for better UI visibility when builder is on
     this.editor.on('show', () => mQuery('#flashes').addClass('alert-offset'));
@@ -824,31 +813,13 @@ export default class BuilderService {
     };
   }
 
+  static getBaseToolbarItems() {
+    return ['undo', 'redo', '|', 'bold', 'italic', 'underline', 'strikethrough', '|', 'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|', 'alignment', 'outdent', 'indent', '|', 'bulletedList', 'numberedList', '|', 'link'];
+  }
+
   static getCkeConf(tokenCallback) {
     const contentPolicy = BuilderService.getCkEditorContentPolicy();
-    const blockToolbar = [
-      'undo',
-      'redo',
-      '|',
-      'bold',
-      'italic',
-      'underline',
-      'strikethrough',
-      '|',
-      'fontSize',
-      'fontFamily',
-      'fontColor',
-      'fontBackgroundColor',
-      '|',
-      'alignment',
-      'outdent',
-      'indent',
-      '|',
-      'bulletedList',
-      'numberedList',
-      '|',
-      'link',
-    ];
+    const blockToolbar = BuilderService.getBaseToolbarItems();
 
     if (contentPolicy.allowTables !== false) {
       blockToolbar.push('|', 'insertTable');
@@ -1024,22 +995,7 @@ export default class BuilderService {
 
   static buildInlineCkeConf(baseOptions) {
     const contentPolicy = BuilderService.getCkEditorContentPolicy();
-    const inlineToolbar = [
-      'undo',
-      'redo',
-      '|',
-      'bold',
-      'italic',
-      'underline',
-      'strikethrough',
-      '|',
-      'fontSize',
-      'fontFamily',
-      'fontColor',
-      'fontBackgroundColor',
-      '|',
-      'link',
-    ];
+    const inlineToolbar = BuilderService.getBaseToolbarItems();
 
     if (contentPolicy.allowTables !== false) {
       inlineToolbar.push('|', 'insertTable');
@@ -1177,7 +1133,7 @@ export default class BuilderService {
           content_policy: BuilderService.getCkEditorContentPolicy(),
           reuse_editor: false,
           toolbar_max_width: '445px',
-          inline_toolbar_max_width: '360px',
+          inline_toolbar_max_width: '445px',
           theme_alias: BuilderService.getActiveThemeAlias(),
         },
         ...BuilderService.getPluginOptions('page'), // grapesjs-custom-plugins: add the plugin-options
@@ -1254,7 +1210,7 @@ export default class BuilderService {
           content_policy: BuilderService.getCkEditorContentPolicy(),
           reuse_editor: false,
           toolbar_max_width: '445px',
-          inline_toolbar_max_width: '360px',
+          inline_toolbar_max_width: '445px',
           theme_alias: BuilderService.getActiveThemeAlias(),
         },
         ...BuilderService.getPluginOptions('email-mjml'),
@@ -1380,7 +1336,7 @@ export default class BuilderService {
           content_policy: BuilderService.getCkEditorContentPolicy(),
           reuse_editor: false,
           toolbar_max_width: '445px',
-          inline_toolbar_max_width: '360px',
+          inline_toolbar_max_width: '445px',
           theme_alias: BuilderService.getActiveThemeAlias(),
         },
         ...BuilderService.getPluginOptions('email-html'),
@@ -1551,153 +1507,6 @@ export default class BuilderService {
       this.editor.BlockManager.remove(rawblock);
     }
   }
-
-  setupTypographySectorVisibility() {
-    if (!this.editor || this.typographySectorInitialized) {
-      return;
-    }
-
-    const styleManager = this.editor.StyleManager;
-    if (!styleManager || typeof styleManager.getSector !== 'function') {
-      return;
-    }
-
-    const sector = styleManager.getSector('typography');
-    if (!sector) {
-      return;
-    }
-
-    this.typographySector = sector;
-    // Delay updates slightly so GrapesJS finishes its own selection bookkeeping before we toggle the sector.
-    const scheduleUpdate = (target, delay) =>
-      this.scheduleTypographySectorVisibilityUpdate(target, delay);
-    const selectionDelay = 15;
-
-    this.editor.on('component:selected', (component) => scheduleUpdate(component, selectionDelay));
-    this.editor.on('component:deselected', () =>
-      this.scheduleTypographySectorVisibilityUpdate(null, selectionDelay)
-    );
-    this.editor.on('rte:enable', (component) => scheduleUpdate(component, selectionDelay));
-    this.editor.on('rte:disable', () =>
-      this.scheduleTypographySectorVisibilityUpdate(null, selectionDelay)
-    );
-
-    this.typographySectorInitialized = true;
-    this.scheduleTypographySectorVisibilityUpdate(null, selectionDelay);
-  }
-
-  scheduleTypographySectorVisibilityUpdate(target, delay = 0) {
-    if (!this.typographySector) {
-      return;
-    }
-
-    this.clearTypographySectorUpdateTimeout();
-
-    const run = () => {
-      this.typographySectorTimeout = null;
-      this.updateTypographySectorVisibility(target);
-    };
-
-    this.typographySectorTimeout = this.scheduleTypographyTimeout(run, delay);
-  }
-
-  clearTypographySectorUpdateTimeout() {
-    if (!this.typographySectorTimeout) {
-      return;
-    }
-
-    const timeoutId = this.typographySectorTimeout;
-    this.typographySectorTimeout = null;
-
-    if (typeof window !== 'undefined' && typeof window.clearTimeout === 'function') {
-      window.clearTimeout(timeoutId);
-      return;
-    }
-
-    clearTimeout(timeoutId);
-  }
-
-  scheduleTypographyTimeout(callback, delay = 0) {
-    const timeoutDelay = typeof delay === 'number' && delay > 0 ? delay : 0;
-
-    if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') {
-      return window.setTimeout(callback, timeoutDelay);
-    }
-
-    return setTimeout(callback, timeoutDelay);
-  }
-
-  updateTypographySectorVisibility(target = null) {
-    const styleManager = this.editor?.StyleManager;
-    if (!styleManager || typeof styleManager.getSector !== 'function') {
-      return;
-    }
-
-    const sector = styleManager.getSector('typography');
-    if (!sector) {
-      return;
-    }
-
-    this.typographySector = sector;
-
-    const component = this.getTypographyTargetComponent(target);
-    const shouldHide = this.shouldHideTypographySector(component);
-
-    this.setTypographySectorModelVisibility(sector, shouldHide);
-    this.setTypographySectorDomVisibility(sector, shouldHide);
-  }
-
-  getTypographyTargetComponent(target) {
-    const resolvedTarget = this.resolveComponentFromTarget(target);
-    if (resolvedTarget) {
-      return resolvedTarget;
-    }
-
-    if (this.editor && typeof this.editor.getSelected === 'function') {
-      return this.editor.getSelected();
-    }
-
-    return null;
-  }
-
-  setTypographySectorModelVisibility(sector, shouldHide) {
-    if (typeof sector.set === 'function') {
-      sector.set('visible', !shouldHide);
-      return;
-    }
-
-    sector.visible = !shouldHide;
-  }
-
-  setTypographySectorDomVisibility(sector, shouldHide) {
-    const sectorEl = this.resolveTypographySectorElement(sector);
-
-    if (sectorEl) {
-      sectorEl.style.display = shouldHide ? 'none' : '';
-    }
-  }
-
-  resolveTypographySectorElement(sector) {
-    const sectorId = typeof sector.getId === 'function' ? sector.getId() : 'typography';
-    const editorContainer =
-      this.editor && typeof this.editor.getContainer === 'function'
-        ? this.editor.getContainer()
-        : null;
-
-    if (editorContainer) {
-      const sectorEl = editorContainer.querySelector(`.gjs-sm-sector[id*="${sectorId}"]`);
-      if (sectorEl) {
-        return sectorEl;
-      }
-    }
-
-    if (sector.view?.el) {
-      return sector.view.el;
-    }
-
-    return null;
-  }
-
   resolveComponentFromTarget(target) {
     if (!target) {
       return null;
@@ -1941,9 +1750,5 @@ export default class BuilderService {
     children.forEach((childComponent) => {
       this.walkComponentTree(childComponent, visitor);
     });
-  }
-
-  shouldHideTypographySector(component) {
-    return true;
   }
 }
