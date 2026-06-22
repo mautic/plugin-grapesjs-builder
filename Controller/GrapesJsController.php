@@ -121,7 +121,7 @@ class GrapesJsController extends CommonController
             $isNew = true;
 
             if (!$this->security->isGranted($aclToCheck.'create')) {
-                $this->checkAccessDenied();
+                $this->throwAccessDenied();
             }
 
             /** @var Email|Page $entity */
@@ -139,7 +139,7 @@ class GrapesJsController extends CommonController
                     $entity->getCreatedBy()
                 )
             ) {
-                $this->checkAccessDenied();
+                $this->throwAccessDenied();
             }
         }
 
@@ -217,7 +217,7 @@ class GrapesJsController extends CommonController
                 $entity->getCreatedBy()
             )
         ) {
-            $this->checkAccessDenied();
+            $this->throwAccessDenied();
         }
 
         $content     = $this->normalizeContentToArray($entity->getContent());
