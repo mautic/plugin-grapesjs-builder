@@ -64,7 +64,7 @@ class GrapesJsBuilder
     /**
      * @return GrapesJsBuilder
      */
-    public function setEmail(Email $email)
+    public function setEmail(Email $email): static
     {
         $this->email = $email;
 
@@ -84,7 +84,7 @@ class GrapesJsBuilder
      *
      * @return GrapesJsBuilder
      */
-    public function setCustomMjml($customMjml)
+    public function setCustomMjml($customMjml): static
     {
         $this->customMjml = $customMjml;
 
