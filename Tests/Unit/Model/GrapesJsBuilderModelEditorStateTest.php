@@ -40,7 +40,7 @@ final class GrapesJsBuilderModelEditorStateTest extends TestCase
 
         /** @var MockObject&EmailRepository $emailRepository */
         $emailRepository = $this->createMock(EmailRepository::class);
-        $emailRepository->expects(self::once())
+        $emailRepository->expects($this->once())
             ->method('saveEntity')
             ->with(self::isInstanceOf(Email::class));
 
@@ -52,7 +52,7 @@ final class GrapesJsBuilderModelEditorStateTest extends TestCase
         /** @var MockObject&GrapesJsBuilderRepository $grapesRepository */
         $grapesRepository = $this->createMock(GrapesJsBuilderRepository::class);
         $grapesRepository->method('findOneBy')->willReturn(null);
-        $grapesRepository->expects(self::once())
+        $grapesRepository->expects($this->once())
             ->method('saveEntity')
             ->with(self::callback(static function ($entity): bool {
                 return $entity instanceof GrapesJsBuilder && '<mjml/>' === $entity->getCustomMjml();
@@ -120,8 +120,8 @@ final class GrapesJsBuilderModelEditorStateTest extends TestCase
 
         /** @var MockObject&EntityManager $entityManager */
         $entityManager = $this->createMock(EntityManager::class);
-        $entityManager->expects(self::once())->method('persist');
-        $entityManager->expects(self::once())->method('flush');
+        $entityManager->expects($this->once())->method('persist');
+        $entityManager->expects($this->once())->method('flush');
 
         $model = $this->getModel($requestStack, $emailModel, $entityManager);
 
