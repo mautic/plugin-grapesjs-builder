@@ -23,11 +23,7 @@ final class EmailSubscriberTest extends TestCase
     private MockObject $config;
     /** @var MockObject&GrapesJsBuilderRepository */
     private MockObject $grapesJsBuilderRepo;
-<<<<<<< HEAD
-    private MockObject $emailModel;
-    private MockObject $emailConfig;
-=======
->>>>>>> f71dbbecbb ([tests] inline setUp properties used just once)
+
     private EmailSubscriber $subscriber;
 
     protected function setUp(): void
