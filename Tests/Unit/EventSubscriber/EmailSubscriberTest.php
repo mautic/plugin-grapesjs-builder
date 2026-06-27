@@ -21,27 +21,28 @@ final class EmailSubscriberTest extends TestCase
 {
     /** @var MockObject&Config */
     private MockObject $config;
-    /** @var MockObject&GrapesJsBuilderModel */
-    private MockObject $grapesJsBuilderModel;
     /** @var MockObject&GrapesJsBuilderRepository */
     private MockObject $grapesJsBuilderRepo;
+<<<<<<< HEAD
     private MockObject $emailModel;
     private MockObject $emailConfig;
+=======
+>>>>>>> f71dbbecbb ([tests] inline setUp properties used just once)
     private EmailSubscriber $subscriber;
 
     protected function setUp(): void
     {
         $this->config               = $this->createMock(Config::class);
-        $this->grapesJsBuilderModel = $this->createMock(GrapesJsBuilderModel::class);
-        $this->emailModel           = $this->createMock(EmailModel::class);
-        $this->emailConfig          = $this->createMock(EmailConfigInterface::class);
+        $grapesJsBuilderModel       = $this->createMock(GrapesJsBuilderModel::class);
+        $emailModel                 = $this->createMock(EmailModel::class);
+        $emailConfig                = $this->createMock(EmailConfigInterface::class);
         $this->grapesJsBuilderRepo  = $this->createMock(GrapesJsBuilderRepository::class);
-        $this->subscriber           = new EmailSubscriber($this->config, $this->grapesJsBuilderModel, $this->emailModel, $this->emailConfig);
+        $this->subscriber           = new EmailSubscriber($this->config, $grapesJsBuilderModel, $emailModel, $emailConfig);
 
-        $this->emailModel->method('getRepository')
+        $emailModel->method('getRepository')
             ->willReturn($this->createMock(EmailRepository::class));
 
-        $this->grapesJsBuilderModel->method('getRepository')
+        $grapesJsBuilderModel->method('getRepository')
             ->willReturn($this->grapesJsBuilderRepo);
     }
 
